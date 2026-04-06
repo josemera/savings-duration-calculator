@@ -19,7 +19,20 @@ Three return modes let you stress-test different scenarios:
 Classic calculation using a single annual return rate (0–15%), applied monthly via compound growth. Good for a quick baseline.
 
 ### Historical sequence
-Uses 14 real annual returns derived from a cumulative portfolio return series, applied in order and cycling after year 14. Captures the actual sequence-of-returns effect — including a significant down year (~−20%) partway through the cycle.
+Uses 14 real annual returns derived from the actual cumulative performance of a real portfolio, starting in January 2012. The portfolio composition at the time the returns were recorded was:
+
+| Ticker | Allocation | Description |
+|--------|-----------|-------------|
+| VPU    | 30%       | Vanguard Utilities ETF |
+| IYF    | 25%       | iShares U.S. Financials ETF |
+| SCHD   | 15%       | Schwab U.S. Dividend Equity ETF |
+| IVV    | 10%       | iShares Core S&P 500 ETF |
+| VTI    | 5%        | Vanguard Total Stock Market ETF |
+| QQQ    | 5%        | Invesco Nasdaq-100 ETF |
+| SMH    | 5%        | VanEck Semiconductor ETF |
+| VGT    | 5%        | Vanguard Information Technology ETF |
+
+Returns are applied in order and cycle after year 14. The sequence captures the actual sequence-of-returns effect of this allocation — including a significant down year (~−20%) partway through the cycle.
 
 The 14 derived annual returns are:
 
