@@ -5,7 +5,6 @@ A single-file, client-side web app that models how long a portfolio will last un
 ## Live demo
 
 [https://https://josemera.github.io/savings-duration-calculator/](https://josemera.github.io/savings-duration-calculator/)
-*(replace with your GitHub Pages URL after deploying)*
 
 ---
 
