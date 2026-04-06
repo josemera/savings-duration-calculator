@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Savings Duration Calculator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #030712; color: #fff; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; padding: 16px; }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #6b7280; font-size: 13px; margin-bottom: 20px; }
+
+  /* Mode toggle */
+  .mode-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .mode-label { color: #9ca3af; font-size: 12px; white-space: nowrap; }
+  .toggle-group { display: flex; }
+  .toggle-btn {
+    padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    border: 1px solid #374151; background: #111827; color: #9ca3af;
+    transition: background 0.15s, color 0.15s;
+  }
+  .toggle-btn:first-child { border-radius: 6px 0 0 6px; }
+  .toggle-btn:last-child { border-radius: 0 6px 6px 0; }
+  .toggle-btn:not(:first-child) { border-left: none; }
+  .toggle-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+  /* Controls panel */
+  .controls { background: #111827; border-radius: 12px; padding: 16px; margin-bottom: 20px; border: 1px solid #1f2937; }
+  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-row label { color: #9ca3af; font-size: 12px; min-width: 160px; }
+
+  input[type=number] {
+    background: #1f2937; color: #fff; border: 1px solid #374151;
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; flex: 1;
+    outline: none;
+  }
+  input[type=number]:focus { border-color: #2563eb; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; flex: 1; height: 6px;
+    background: #374151; border-radius: 3px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; background: #fff;
+    border-radius: 50%; border: 2px solid #374151; cursor: pointer;
+  }
+  .range-val { font-size: 13px; font-weight: 700; background: #1f2937; border-radius: 6px; padding: 4px 10px; min-width: 64px; text-align: center; color: #d1d5db; }
+
+  .divider { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
+
+  .mode-note { color: #4b5563; font-size: 12px; margin-bottom: 14px; }
+
+  .reshuffle-btn {
+    padding: 6px 14px; background: #1f2937; color: #9ca3af; border: 1px solid #374151;
+    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .reshuffle-btn:hover { background: #374151; color: #d1d5db; }
+
+  /* Stat cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .card { background: #111827; border-radius: 10px; padding: 12px; border: 1px solid #1f2937; }
+  .card-label { color: #6b7280; font-size: 11px; margin-bottom: 4px; }
+  .card-value { font-weight: 700; font-size: 18px; }
+  .card-value.green { color: #4ade80; }
+  .card-value.red { color: #f87171; }
+  .card-value.blue { color: #60a5fa; }
+
+  /* Chart */
+  .chart-wrap { background: #111827; border-radius: 12px; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; }
+  .chart-wrap canvas { max-height: 260px; }
+
+  /* Tables */
+  .table-wrap { background: #111827; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden; margin-bottom: 20px; }
+  .table-title { padding: 12px 16px; border-bottom: 1px solid #1f2937; font-size: 13px; color: #d1d5db; font-weight: 700; }
+  .scroll { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    padding: 8px 12px; color: #6b7280; font-size: 12px; font-weight: 600;
+    border-bottom: 1px solid #1f2937; text-align: right; white-space: nowrap;
+    position: sticky; top: 0; background: #111827; z-index: 1;
+  }
+  th:first-child { text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid #0f172a; text-align: right; white-space: nowrap; }
+  td:first-child { text-align: left; color: #9ca3af; }
+  tr:hover td { background: #1a2433; }
+  .green { color: #4ade80; } .red { color: #f87171; } .blue { color: #60a5fa; } .muted { color: #6b7280; }
+
+  /* Sequence ref table */
+  .seq-ref { margin-top: 20px; }
+
+  @media (max-width: 600px) {
+    .control-row { flex-wrap: wrap; }
+    .control-row label { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Savings Duration Calculator</h1>
+  <p class="subtitle">How long will your savings last? Model with a fixed rate, historical sequence, or Monte Carlo simulation.</p>
+
+  <!-- Mode toggle -->
+  <div class="mode-row">
+    <span class="mode-label">Return mode</span>
+    <div class="toggle-group">
+      <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
+      <button class="toggle-btn" id="btn-seq" onclick="setMode('seq')">Historical sequence</button>
+      <button class="toggle-btn" id="btn-rand" onclick="setMode('rand')">Monte Carlo</button>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-row">
+      <label>Starting capital ($)</label>
+      <input type="number" id="capital" value="500000" oninput="calculate()" />
+    </div>
+    <div class="control-row">
+      <label>Monthly spend ($)</label>
+      <input type="number" id="monthly" value="4000" oninput="calculate()" />
+    </div>
+
+    <!-- Fixed rate panel -->
+    <div id="fixed-panel">
+      <div class="control-row">
+        <label>Annual rate (%)</label>
+        <input type="range" min="0" max="15" step="0.1" value="6" id="rate"
+          oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)+'%';calculate()" />
+        <span class="range-val" id="rateVal">6.0%</span>
+      </div>
+    </div>
+
+    <!-- Seq panel -->
+    <div id="seq-panel" style="display:none;">
+      <p class="mode-note">Uses 14 historical annual returns in order, cycling after year 14.</p>
+    </div>
+
+    <!-- Monte Carlo panel -->
+    <div id="rand-panel" style="display:none;">
+      <div class="control-row">
+        <p class="mode-note" style="flex:1;">14 historical returns drawn in random order, refilling each cycle. Each reshuffle is a new scenario.</p>
+        <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Social Security -->
+    <div class="control-row">
+      <label>SS payment ($/mo)</label>
+      <input type="number" id="ss-amount" value="0" oninput="calculate()" />
+    </div>
+    <div class="control-row">
+      <label>SS starts in (months)</label>
+      <input type="range" min="0" max="120" step="1" value="0" id="ss-delay"
+        oninput="document.getElementById('ssVal').textContent=this.value+' mo';calculate()" />
+      <span class="range-val" id="ssVal">0 mo</span>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="cards" id="cards"></div>
+
+  <!-- Chart -->
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <!-- Yearly table -->
+  <div class="table-wrap">
+    <div class="table-title">Yearly breakdown</div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;">Year</th>
+            <th id="th-seq">Seq yr</th>
+            <th>Return</th>
+            <th>Interest</th>
+            <th id="th-ss" style="display:none;">SS income</th>
+            <th>Withdrawals</th>
+            <th>Net change</th>
+            <th>Balance</th>
+          </tr>
+        </thead>
+        <tbody id="yr-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sequence reference -->
+  <div class="table-wrap seq-ref" id="seq-ref" style="display:none;">
+    <div class="table-title">14-year sequence reference</div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;">Seq yr</th>
+            <th>Annual return</th>
+            <th>From cumulative</th>
+            <th>To cumulative</th>
+          </tr>
+        </thead>
+        <tbody id="seq-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CUMULATIVE = [13.0, 45.2, 71.5, 70.1, 98.4, 140.5, 131.4, 208.3, 256.5, 358.9, 287.8, 371.3, 497.8, 626.2];
+const ANNUAL_RETURNS = (() => {
+  const r = []; let prev = 1.0;
+  for (let i = 0; i < CUMULATIVE.length; i++) {
+    const curr = 1 + CUMULATIVE[i] / 100;
+    r.push(curr / prev - 1); prev = curr;
+  }
+  return r;
+})();
+
+const MAX_YEARS = 30;
+let mode = 'fixed';
+let chartInstance = null;
+let shuffledSequence = [];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildFullRandomSequence() {
+  const seq = [];
+  while (seq.length < MAX_YEARS) {
+    seq.push(...shuffleArray(ANNUAL_RETURNS.map((r, i) => ({ r, origIdx: i + 1 }))));
+  }
+  return seq.slice(0, MAX_YEARS);
+}
+
+function reshuffle() {
+  shuffledSequence = buildFullRandomSequence();
+  calculate();
+}
+
+function setMode(m) {
+  mode = m;
+  ['fixed','seq','rand'].forEach(id => document.getElementById('btn-'+id).classList.toggle('active', m === id));
+  document.getElementById('fixed-panel').style.display = m === 'fixed' ? '' : 'none';
+  document.getElementById('seq-panel').style.display = m === 'seq' ? '' : 'none';
+  document.getElementById('rand-panel').style.display = m === 'rand' ? '' : 'none';
+  document.getElementById('seq-ref').style.display = m === 'seq' ? '' : 'none';
+  document.getElementById('th-seq').style.display = (m === 'seq' || m === 'rand') ? '' : 'none';
+  if (m === 'seq') buildSeqTable();
+  if (m === 'rand' && shuffledSequence.length === 0) reshuffle();
+  else calculate();
+}
+
+function buildSeqTable() {
+  const tbody = document.getElementById('seq-tbody');
+  tbody.innerHTML = '';
+  for (let i = 0; i < ANNUAL_RETURNS.length; i++) {
+    const r = ANNUAL_RETURNS[i];
+    const fromC = i === 0 ? '0.0' : CUMULATIVE[i-1].toFixed(1);
+    const cls = r >= 0 ? 'green' : 'red';
+    tbody.innerHTML += `<tr>
+      <td style="text-align:left;">${i+1}</td>
+      <td class="${cls}">${r>=0?'+':''}${(r*100).toFixed(1)}%</td>
+      <td class="muted">+${fromC}%</td>
+      <td class="muted">+${CUMULATIVE[i].toFixed(1)}%</td>
+    </tr>`;
+  }
+}
+
+function getYearReturn(y) {
+  if (mode === 'fixed') return { r: parseFloat(document.getElementById('rate').value) / 100, seqYr: null };
+  if (mode === 'seq') return { r: ANNUAL_RETURNS[y % ANNUAL_RETURNS.length], seqYr: (y % ANNUAL_RETURNS.length) + 1 };
+  const entry = shuffledSequence[y] || { r: ANNUAL_RETURNS[0], origIdx: 1 };
+  return { r: entry.r, seqYr: entry.origIdx };
+}
+
+function calculate() {
+  const capital = parseFloat(document.getElementById('capital').value) || 0;
+  const monthly = parseFloat(document.getElementById('monthly').value) || 0;
+  const ssAmount = parseFloat(document.getElementById('ss-amount').value) || 0;
+  const ssDelay = parseInt(document.getElementById('ss-delay').value) || 0;
+  if (capital <= 0 || monthly <= 0) return;
+
+  const balData = [capital];
+  const labels = ['Start'];
+  const yearRows = [];
+  let balance = capital;
+  let depleted = false;
+  let depletedYear = null;
+
+  for (let y = 0; y < MAX_YEARS; y++) {
+    if (balance <= 0) { depleted = true; depletedYear = y; break; }
+
+    const { r: annualReturn, seqYr } = getYearReturn(y);
+    const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
+    let yearInterest = 0, yearSS = 0, yearWithdraw = 0;
+    const startBalance = balance;
+
+    for (let m = 0; m < 12; m++) {
+      if (balance <= 0) break;
+      const globalMonth = y * 12 + m;
+      const interest = balance * monthlyRate;
+      const ss = (ssAmount > 0 && globalMonth >= ssDelay) ? ssAmount : 0;
+      yearInterest += interest;
+      yearSS += ss;
+      yearWithdraw += monthly;
+      balance = Math.max(0, balance + interest + ss - monthly);
+    }
+
+    const netChange = balance - startBalance;
+    yearRows.push({ year: y+1, seqYr, annualReturn, yearInterest, yearSS, yearWithdraw, netChange, balance });
+
+    const seqLabel = seqYr !== null ? ` [S${seqYr}]` : '';
+    labels.push(`Yr ${y+1}${seqLabel}`);
+    balData.push(Math.round(balance));
+  }
+
+  const totalInterest = yearRows.reduce((s, r) => s + r.yearInterest, 0);
+  const totalSS = yearRows.reduce((s, r) => s + r.yearSS, 0);
+  const finalBal = balData[balData.length - 1];
+
+  // Stat cards
+  const cards = document.getElementById('cards');
+  if (depleted) {
+    cards.innerHTML = `
+      <div class="card"><div class="card-label">Depleted at</div><div class="card-value red">Yr ${depletedYear}</div></div>
+      <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
+      ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">${fmt0(totalSS)}</div></div>` : ''}
+    `;
+  } else {
+    const gainPct = ((finalBal / capital) - 1) * 100;
+    cards.innerHTML = `
+      <div class="card"><div class="card-label">Balance at yr 30</div><div class="card-value green">$${fmt0(finalBal)}</div></div>
+      <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
+      <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
+      ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
+    `;
+  }
+
+  buildYearTable(yearRows, ssAmount > 0);
+  drawChart(labels, balData);
+}
+
+function fmt0(n) { return Math.round(n).toLocaleString(); }
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+function fmtD(n) { return '$' + Math.round(n).toLocaleString(); }
+
+function buildYearTable(rows, showSS) {
+  document.getElementById('th-ss').style.display = showSS ? '' : 'none';
+  document.getElementById('th-seq').style.display = (mode === 'seq' || mode === 'rand') ? '' : 'none';
+
+  document.getElementById('yr-tbody').innerHTML = rows.map(r => {
+    const retCls = r.annualReturn >= 0 ? 'green' : 'red';
+    const netCls = r.netChange >= 0 ? 'green' : 'red';
+    const seqTd = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
+    const ssTd = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
+    return `<tr>
+      <td style="text-align:left;">${r.year}</td>
+      ${seqTd}
+      <td class="${retCls}">${fmtPct(r.annualReturn * 100)}</td>
+      <td>${fmtD(r.yearInterest)}</td>
+      ${ssTd}
+      <td>${fmtD(r.yearWithdraw)}</td>
+      <td class="${netCls}">${fmtD(r.netChange)}</td>
+      <td>${fmtD(r.balance)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function drawChart(labels, balData) {
+  if (chartInstance) chartInstance.destroy();
+  const color = mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
+  const bg = mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
+
+  chartInstance = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Balance', data: balData, borderColor: color, backgroundColor: bg, fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
+          titleColor: '#d1d5db', bodyColor: '#fff',
+          callbacks: { label: c => ' Balance: $' + c.parsed.y.toLocaleString() }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, color: '#6b7280', font: { size: 11 }, maxRotation: 45 }, grid: { color: '#1f2937' } },
+        y: { beginAtZero: true, ticks: { callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v), color: '#6b7280', font: { size: 11 } }, grid: { color: '#1f2937' } }
+      }
+    }
+  });
+}
+
+calculate();
+</script>
+</body>
+</html>
