@@ -51,23 +51,29 @@
   .range-val { font-size: 13px; font-weight: 700; background: #1f2937; border-radius: 6px; padding: 4px 10px; min-width: 64px; text-align: center; color: #d1d5db; }
 
   .divider { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
-
-  .mode-note { color: #4b5563; font-size: 12px; margin-bottom: 14px; }
+  .mode-note { color: #4b5563; font-size: 12px; }
 
   .reshuffle-btn {
     padding: 6px 14px; background: #1f2937; color: #9ca3af; border: 1px solid #374151;
-    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
   }
   .reshuffle-btn:hover { background: #374151; color: #d1d5db; }
+
+  .run-analysis-btn {
+    padding: 6px 14px; background: #4c1d95; color: #c4b5fd; border: 1px solid #6d28d9;
+    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .run-analysis-btn:hover { background: #5b21b6; color: #ddd6fe; }
 
   /* Stat cards */
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
   .card { background: #111827; border-radius: 10px; padding: 12px; border: 1px solid #1f2937; }
   .card-label { color: #6b7280; font-size: 11px; margin-bottom: 4px; }
   .card-value { font-weight: 700; font-size: 18px; }
-  .card-value.green { color: #4ade80; }
-  .card-value.red { color: #f87171; }
-  .card-value.blue { color: #60a5fa; }
+  .card-value.green  { color: #4ade80; }
+  .card-value.red    { color: #f87171; }
+  .card-value.blue   { color: #60a5fa; }
+  .card-value.purple { color: #a78bfa; }
 
   /* Chart */
   .chart-wrap { background: #111827; border-radius: 12px; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; }
@@ -92,6 +98,23 @@
   /* Sequence ref table */
   .seq-ref { margin-top: 20px; }
 
+  /* MC Analysis section */
+  .mc-section {
+    background: #0a0f1a; border: 1px solid #2d1f5e; border-radius: 12px;
+    overflow: hidden; margin-bottom: 20px;
+  }
+  .mc-section-header {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    padding: 12px 16px; border-bottom: 1px solid #1e1541;
+  }
+  .mc-section-title { font-size: 13px; color: #c4b5fd; font-weight: 700; }
+  .mc-cards-wrap { padding: 16px 16px 0; }
+  .mc-scatter-wrap { padding: 16px; }
+  .mc-viewing-note {
+    padding: 8px 16px; font-size: 11px; color: #6b7280;
+    border-top: 1px solid #1e1541; background: #060a12;
+  }
+
   @media (max-width: 600px) {
     .control-row { flex-wrap: wrap; }
     .control-row label { min-width: 100%; }
@@ -108,8 +131,8 @@
     <span class="mode-label">Return mode</span>
     <div class="toggle-group">
       <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
-      <button class="toggle-btn" id="btn-seq" onclick="setMode('seq')">Historical sequence</button>
-      <button class="toggle-btn" id="btn-rand" onclick="setMode('rand')">Monte Carlo</button>
+      <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical sequence</button>
+      <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Monte Carlo</button>
     </div>
   </div>
 
@@ -117,11 +140,11 @@
   <div class="controls">
     <div class="control-row">
       <label>Starting capital ($)</label>
-      <input type="number" id="capital" value="500000" oninput="calculate()" />
+      <input type="number" id="capital" value="500000" oninput="onInputChange()" />
     </div>
     <div class="control-row">
       <label>Monthly spend ($)</label>
-      <input type="number" id="monthly" value="4000" oninput="calculate()" />
+      <input type="number" id="monthly" value="4000" oninput="onInputChange()" />
     </div>
 
     <!-- Fixed rate panel -->
@@ -129,7 +152,7 @@
       <div class="control-row">
         <label>Annual rate (%)</label>
         <input type="range" min="0" max="15" step="0.1" value="6" id="rate"
-          oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)+'%';calculate()" />
+          oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
         <span class="range-val" id="rateVal">6.0%</span>
       </div>
     </div>
@@ -141,9 +164,10 @@
 
     <!-- Monte Carlo panel -->
     <div id="rand-panel" style="display:none;">
-      <div class="control-row">
-        <p class="mode-note" style="flex:1;">14 historical returns drawn in random order, refilling each cycle. Each reshuffle is a new scenario.</p>
+      <div class="control-row" style="margin-bottom:0;">
+        <p class="mode-note" style="flex:1;">14 historical returns drawn in random order, refilling each cycle.</p>
         <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
+        <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
       </div>
     </div>
 
@@ -152,22 +176,40 @@
     <!-- Social Security -->
     <div class="control-row">
       <label>SS payment ($/mo)</label>
-      <input type="number" id="ss-amount" value="0" oninput="calculate()" />
+      <input type="number" id="ss-amount" value="0" oninput="onInputChange()" />
     </div>
     <div class="control-row">
       <label>SS starts in (months)</label>
       <input type="range" min="0" max="120" step="1" value="0" id="ss-delay"
-        oninput="document.getElementById('ssVal').textContent=this.value+' mo';calculate()" />
+        oninput="document.getElementById('ssVal').textContent=this.value+' mo';onInputChange()" />
       <span class="range-val" id="ssVal">0 mo</span>
     </div>
   </div>
 
-  <!-- Stat cards -->
+  <!-- Stat cards (single run) -->
   <div class="cards" id="cards"></div>
 
   <!-- Chart -->
   <div class="chart-wrap">
     <canvas id="chart"></canvas>
+  </div>
+
+  <!-- MC Analysis section -->
+  <div class="mc-section" id="mc-analysis" style="display:none;">
+    <div class="mc-section-header">
+      <span class="mc-section-title">&#127912; 500-Run Distribution</span>
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="scatter-tab-outcome"  onclick="switchScatterTab('outcome')">Outcome</button>
+        <button class="toggle-btn"        id="scatter-tab-timeline" onclick="switchScatterTab('timeline')">Timeline</button>
+      </div>
+    </div>
+    <div class="mc-cards-wrap">
+      <div class="cards" id="mc-cards" style="margin-bottom:0;"></div>
+    </div>
+    <div class="mc-scatter-wrap">
+      <canvas id="scatterChart" height="220" style="cursor:crosshair;"></canvas>
+    </div>
+    <div class="mc-viewing-note" id="mc-viewing-note" style="display:none;"></div>
   </div>
 
   <!-- Yearly table -->
@@ -226,7 +268,16 @@ const ANNUAL_RETURNS = (() => {
 const MAX_YEARS = 30;
 let mode = 'fixed';
 let chartInstance = null;
+let scatterInstance = null;
 let shuffledSequence = [];
+
+// MC analysis state
+let mcRuns = [];
+let mcAnalysisActive = false;
+let activeScatterTab = 'outcome';
+let viewingRunIdx = null;
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -245,19 +296,49 @@ function buildFullRandomSequence() {
   return seq.slice(0, MAX_YEARS);
 }
 
+function percentile(arr, p) {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function fmt0(n)   { return Math.round(n).toLocaleString(); }
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+function fmtD(n)   { return '$' + Math.round(n).toLocaleString(); }
+
+// ─── Input / mode handlers ───────────────────────────────────────────────────
+
+function onInputChange() {
+  if (mcAnalysisActive) resetAnalysis();
+  calculate();
+}
+
 function reshuffle() {
   shuffledSequence = buildFullRandomSequence();
+  resetAnalysis();
   calculate();
+}
+
+function resetAnalysis() {
+  mcRuns = [];
+  mcAnalysisActive = false;
+  viewingRunIdx = null;
+  document.getElementById('mc-analysis').style.display = 'none';
+  if (scatterInstance) { scatterInstance.destroy(); scatterInstance = null; }
 }
 
 function setMode(m) {
   mode = m;
   ['fixed','seq','rand'].forEach(id => document.getElementById('btn-'+id).classList.toggle('active', m === id));
-  document.getElementById('fixed-panel').style.display = m === 'fixed' ? '' : 'none';
-  document.getElementById('seq-panel').style.display = m === 'seq' ? '' : 'none';
-  document.getElementById('rand-panel').style.display = m === 'rand' ? '' : 'none';
-  document.getElementById('seq-ref').style.display = m === 'seq' ? '' : 'none';
-  document.getElementById('th-seq').style.display = (m === 'seq' || m === 'rand') ? '' : 'none';
+  document.getElementById('fixed-panel').style.display  = m === 'fixed' ? '' : 'none';
+  document.getElementById('seq-panel').style.display    = m === 'seq'   ? '' : 'none';
+  document.getElementById('rand-panel').style.display   = m === 'rand'  ? '' : 'none';
+  document.getElementById('seq-ref').style.display      = m === 'seq'   ? '' : 'none';
+  document.getElementById('th-seq').style.display       = (m === 'seq' || m === 'rand') ? '' : 'none';
+  resetAnalysis();
   if (m === 'seq') buildSeqTable();
   if (m === 'rand' && shuffledSequence.length === 0) reshuffle();
   else calculate();
@@ -279,22 +360,10 @@ function buildSeqTable() {
   }
 }
 
-function getYearReturn(y) {
-  if (mode === 'fixed') return { r: parseFloat(document.getElementById('rate').value) / 100, seqYr: null };
-  if (mode === 'seq') return { r: ANNUAL_RETURNS[y % ANNUAL_RETURNS.length], seqYr: (y % ANNUAL_RETURNS.length) + 1 };
-  const entry = shuffledSequence[y] || { r: ANNUAL_RETURNS[0], origIdx: 1 };
-  return { r: entry.r, seqYr: entry.origIdx };
-}
+// ─── Core simulation ─────────────────────────────────────────────────────────
 
-function calculate() {
-  const capital = parseFloat(document.getElementById('capital').value) || 0;
-  const monthly = parseFloat(document.getElementById('monthly').value) || 0;
-  const ssAmount = parseFloat(document.getElementById('ss-amount').value) || 0;
-  const ssDelay = parseInt(document.getElementById('ss-delay').value) || 0;
-  if (capital <= 0 || monthly <= 0) return;
-
+function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate) {
   const balData = [capital];
-  const labels = ['Start'];
   const yearRows = [];
   let balance = capital;
   let depleted = false;
@@ -303,7 +372,17 @@ function calculate() {
   for (let y = 0; y < MAX_YEARS; y++) {
     if (balance <= 0) { depleted = true; depletedYear = y; break; }
 
-    const { r: annualReturn, seqYr } = getYearReturn(y);
+    let annualReturn, seqYr;
+    if (mode === 'fixed') {
+      annualReturn = fixedRate; seqYr = null;
+    } else if (mode === 'seq') {
+      annualReturn = ANNUAL_RETURNS[y % ANNUAL_RETURNS.length];
+      seqYr = (y % ANNUAL_RETURNS.length) + 1;
+    } else {
+      const entry = seq[y] || { r: ANNUAL_RETURNS[0], origIdx: 1 };
+      annualReturn = entry.r; seqYr = entry.origIdx;
+    }
+
     const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
     let yearInterest = 0, yearSS = 0, yearWithdraw = 0;
     const startBalance = balance;
@@ -321,15 +400,39 @@ function calculate() {
 
     const netChange = balance - startBalance;
     yearRows.push({ year: y+1, seqYr, annualReturn, yearInterest, yearSS, yearWithdraw, netChange, balance });
-
-    const seqLabel = seqYr !== null ? ` [S${seqYr}]` : '';
-    labels.push(`Yr ${y+1}${seqLabel}`);
     balData.push(Math.round(balance));
   }
 
+  // Pad to MAX_YEARS + 1 so all runs share the same length (needed for fan chart)
+  while (balData.length < MAX_YEARS + 1) balData.push(0);
+
   const totalInterest = yearRows.reduce((s, r) => s + r.yearInterest, 0);
-  const totalSS = yearRows.reduce((s, r) => s + r.yearSS, 0);
-  const finalBal = balData[balData.length - 1];
+  const totalSS       = yearRows.reduce((s, r) => s + r.yearSS, 0);
+  const finalBal      = balData[MAX_YEARS];
+
+  return { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal };
+}
+
+// ─── Single-run calculate ────────────────────────────────────────────────────
+
+function calculate() {
+  const capital   = parseFloat(document.getElementById('capital').value)   || 0;
+  const monthly   = parseFloat(document.getElementById('monthly').value)   || 0;
+  const ssAmount  = parseFloat(document.getElementById('ss-amount').value) || 0;
+  const ssDelay   = parseInt(document.getElementById('ss-delay').value)    || 0;
+  const fixedRate = parseFloat(document.getElementById('rate').value) / 100;
+  if (capital <= 0 || monthly <= 0) return;
+
+  const { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal } =
+    simulateSequence(capital, monthly, ssAmount, ssDelay, shuffledSequence, fixedRate);
+
+  // Build labels
+  const labels = ['Start'];
+  for (let y = 0; y < MAX_YEARS; y++) {
+    const r = yearRows[y];
+    const seqLabel = r && r.seqYr !== null ? ` [S${r.seqYr}]` : '';
+    labels.push(`Yr ${y+1}${seqLabel}`);
+  }
 
   // Stat cards
   const cards = document.getElementById('cards');
@@ -337,7 +440,7 @@ function calculate() {
     cards.innerHTML = `
       <div class="card"><div class="card-label">Depleted at</div><div class="card-value red">Yr ${depletedYear}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
-      ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">${fmt0(totalSS)}</div></div>` : ''}
+      ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
     `;
   } else {
     const gainPct = ((finalBal / capital) - 1) * 100;
@@ -350,22 +453,266 @@ function calculate() {
   }
 
   buildYearTable(yearRows, ssAmount > 0);
-  drawChart(labels, balData);
+
+  if (mcAnalysisActive && mcRuns.length > 0) {
+    drawFanChart();
+  } else {
+    drawChart(labels, balData);
+  }
 }
 
-function fmt0(n) { return Math.round(n).toLocaleString(); }
-function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
-function fmtD(n) { return '$' + Math.round(n).toLocaleString(); }
+// ─── MC Analysis ─────────────────────────────────────────────────────────────
+
+function runMonteCarloAnalysis() {
+  const capital   = parseFloat(document.getElementById('capital').value)   || 0;
+  const monthly   = parseFloat(document.getElementById('monthly').value)   || 0;
+  const ssAmount  = parseFloat(document.getElementById('ss-amount').value) || 0;
+  const ssDelay   = parseInt(document.getElementById('ss-delay').value)    || 0;
+  const fixedRate = parseFloat(document.getElementById('rate').value) / 100;
+  if (capital <= 0 || monthly <= 0) return;
+
+  mcRuns = [];
+  for (let i = 0; i < 500; i++) {
+    const seq = buildFullRandomSequence();
+    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate);
+    mcRuns.push({ seq, ...result });
+  }
+
+  mcAnalysisActive = true;
+  viewingRunIdx = null;
+  document.getElementById('mc-viewing-note').style.display = 'none';
+
+  // Summary cards
+  const survived = mcRuns.filter(r => !r.depleted);
+  const depleted = mcRuns.filter(r =>  r.depleted);
+  const survivedPct  = (survived.length / 500 * 100).toFixed(0);
+  const medianFinal  = percentile(mcRuns.map(r => r.finalBal), 50);
+  const worstDepletion = depleted.length > 0 ? Math.min(...depleted.map(r => r.depletedYear)) : null;
+  const bestFinal    = survived.length > 0 ? Math.max(...survived.map(r => r.finalBal)) : 0;
+
+  const pctColor = parseFloat(survivedPct) >= 80 ? 'green' : parseFloat(survivedPct) >= 50 ? 'blue' : 'red';
+  document.getElementById('mc-cards').innerHTML = `
+    <div class="card"><div class="card-label">Survived 30 yrs</div><div class="card-value ${pctColor}">${survivedPct}%</div></div>
+    <div class="card"><div class="card-label">Median final bal</div><div class="card-value purple">$${fmt0(medianFinal)}</div></div>
+    ${worstDepletion !== null ? `<div class="card"><div class="card-label">Earliest depletion</div><div class="card-value red">Yr ${worstDepletion}</div></div>` : ''}
+    ${survived.length > 0 ? `<div class="card"><div class="card-label">Best outcome</div><div class="card-value green">$${fmt0(bestFinal)}</div></div>` : ''}
+  `;
+
+  document.getElementById('mc-analysis').style.display = '';
+  drawFanChart();
+  drawScatter(activeScatterTab);
+}
+
+function loadRun(runIdx) {
+  viewingRunIdx = runIdx;
+  mcAnalysisActive = false;
+  shuffledSequence = mcRuns[runIdx].seq;
+  calculate();
+  const run = mcRuns[runIdx];
+  const note = document.getElementById('mc-viewing-note');
+  note.style.display = '';
+  note.textContent = `Viewing run #${runIdx + 1} — ${run.depleted ? `depleted Yr ${run.depletedYear}` : `survived · final $${fmt0(run.finalBal)}`} · Click Reshuffle ↺ or Run Analysis ▶ to reset`;
+}
+
+// ─── Fan chart ───────────────────────────────────────────────────────────────
+
+function drawFanChart() {
+  if (chartInstance) chartInstance.destroy();
+
+  const labels = ['Start'];
+  for (let y = 1; y <= MAX_YEARS; y++) labels.push(`Yr ${y}`);
+
+  const p10Data = [], p50Data = [], p90Data = [];
+  for (let yi = 0; yi <= MAX_YEARS; yi++) {
+    const vals = mcRuns.map(r => r.balData[yi]);
+    p10Data.push(Math.round(percentile(vals, 10)));
+    p50Data.push(Math.round(percentile(vals, 50)));
+    p90Data.push(Math.round(percentile(vals, 90)));
+  }
+
+  chartInstance = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '10th pct', data: p10Data,
+          borderColor: 'rgba(167,139,250,0.4)', backgroundColor: 'rgba(167,139,250,0.13)',
+          fill: '+1', borderDash: [4,4], borderWidth: 1, pointRadius: 0, tension: 0.3
+        },
+        {
+          label: '90th pct', data: p90Data,
+          borderColor: 'rgba(167,139,250,0.4)', backgroundColor: 'transparent',
+          fill: false, borderDash: [4,4], borderWidth: 1, pointRadius: 0, tension: 0.3
+        },
+        {
+          label: 'Median', data: p50Data,
+          borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.06)',
+          fill: false, borderWidth: 2, pointRadius: 2, tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: {
+          display: true, position: 'top',
+          labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 20, padding: 10 }
+        },
+        tooltip: {
+          backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
+          titleColor: '#d1d5db', bodyColor: '#fff',
+          callbacks: { label: c => ` ${c.dataset.label}: $${c.parsed.y.toLocaleString()}` }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, color: '#6b7280', font: { size: 11 }, maxRotation: 45 }, grid: { color: '#1f2937' } },
+        y: { beginAtZero: true, ticks: { callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v), color: '#6b7280', font: { size: 11 } }, grid: { color: '#1f2937' } }
+      }
+    }
+  });
+}
+
+// ─── Scatter chart ───────────────────────────────────────────────────────────
+
+function switchScatterTab(tab) {
+  activeScatterTab = tab;
+  document.getElementById('scatter-tab-outcome').classList.toggle('active',  tab === 'outcome');
+  document.getElementById('scatter-tab-timeline').classList.toggle('active', tab === 'timeline');
+  if (mcRuns.length > 0) drawScatter(tab);
+}
+
+function drawScatter(tab) {
+  if (scatterInstance) { scatterInstance.destroy(); scatterInstance = null; }
+
+  const survivedPts = [], depletedPts = [];
+
+  if (tab === 'outcome') {
+    mcRuns.forEach((run, i) => {
+      const pt = { x: run.finalBal, y: Math.round(run.totalInterest), runIdx: i };
+      (run.depleted ? depletedPts : survivedPts).push(pt);
+    });
+  } else {
+    // Sort by final balance ascending; x = rank, y = depletion year (MAX_YEARS if survived)
+    const sorted = mcRuns.map((r, i) => ({ ...r, origIdx: i })).sort((a, b) => a.finalBal - b.finalBal);
+    sorted.forEach((run, rank) => {
+      const yr = run.depleted ? (run.depletedYear || 0) : MAX_YEARS;
+      const pt = { x: rank + 1, y: yr, runIdx: run.origIdx };
+      (run.depleted ? depletedPts : survivedPts).push(pt);
+    });
+  }
+
+  const isOutcome  = tab === 'outcome';
+  const xAxisLabel = isOutcome ? 'Final Balance ($)' : 'Run rank (sorted by final balance)';
+  const yAxisLabel = isOutcome ? 'Total Interest Earned ($)' : `Year depleted  (${MAX_YEARS} = survived)`;
+
+  scatterInstance = new Chart(document.getElementById('scatterChart'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label: 'Survived', data: survivedPts, backgroundColor: 'rgba(74,222,128,0.5)',  pointRadius: 4, pointHoverRadius: 6 },
+        { label: 'Depleted', data: depletedPts, backgroundColor: 'rgba(248,113,113,0.6)', pointRadius: 4, pointHoverRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const el  = elements[0];
+        const pts = el.datasetIndex === 0 ? survivedPts : depletedPts;
+        const pt  = pts[el.index];
+        if (pt !== undefined) loadRun(pt.runIdx);
+      },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 10 } },
+        tooltip: {
+          backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
+          titleColor: '#d1d5db', bodyColor: '#fff',
+          callbacks: {
+            label: c => {
+              const pt  = c.raw;
+              const run = mcRuns[pt.runIdx];
+              if (isOutcome) {
+                return [
+                  ` Final bal: $${fmt0(pt.x)}`,
+                  ` Interest:  $${fmt0(pt.y)}`,
+                  run.depleted ? ` Depleted: Yr ${run.depletedYear}` : ' Survived 30 yrs'
+                ];
+              } else {
+                return [
+                  ` Rank: #${pt.x}`,
+                  run.depleted ? ` Depleted: Yr ${pt.y}` : ` Survived (Yr ${MAX_YEARS})`,
+                  ` Final bal: $${fmt0(run.finalBal)}`
+                ];
+              }
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: xAxisLabel, color: '#6b7280', font: { size: 11 } },
+          ticks: {
+            color: '#6b7280', font: { size: 10 },
+            callback: isOutcome ? v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v) : v => v
+          },
+          grid: { color: '#1f2937' }
+        },
+        y: {
+          title: { display: true, text: yAxisLabel, color: '#6b7280', font: { size: 11 } },
+          ticks: {
+            color: '#6b7280', font: { size: 10 },
+            callback: isOutcome ? v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v) : v => `Yr ${v}`
+          },
+          grid: { color: '#1f2937' }
+        }
+      }
+    }
+  });
+}
+
+// ─── Single-run chart ────────────────────────────────────────────────────────
+
+function drawChart(labels, balData) {
+  if (chartInstance) chartInstance.destroy();
+  const color = mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
+  const bg    = mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
+
+  chartInstance = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Balance', data: balData, borderColor: color, backgroundColor: bg, fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
+          titleColor: '#d1d5db', bodyColor: '#fff',
+          callbacks: { label: c => ' Balance: $' + c.parsed.y.toLocaleString() }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, color: '#6b7280', font: { size: 11 }, maxRotation: 45 }, grid: { color: '#1f2937' } },
+        y: { beginAtZero: true, ticks: { callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v), color: '#6b7280', font: { size: 11 } }, grid: { color: '#1f2937' } }
+      }
+    }
+  });
+}
+
+// ─── Year table ──────────────────────────────────────────────────────────────
 
 function buildYearTable(rows, showSS) {
-  document.getElementById('th-ss').style.display = showSS ? '' : 'none';
+  document.getElementById('th-ss').style.display  = showSS ? '' : 'none';
   document.getElementById('th-seq').style.display = (mode === 'seq' || mode === 'rand') ? '' : 'none';
 
   document.getElementById('yr-tbody').innerHTML = rows.map(r => {
     const retCls = r.annualReturn >= 0 ? 'green' : 'red';
-    const netCls = r.netChange >= 0 ? 'green' : 'red';
-    const seqTd = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
-    const ssTd = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
+    const netCls = r.netChange    >= 0 ? 'green' : 'red';
+    const seqTd  = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
+    const ssTd   = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
     return `<tr>
       <td style="text-align:left;">${r.year}</td>
       ${seqTd}
@@ -377,37 +724,6 @@ function buildYearTable(rows, showSS) {
       <td>${fmtD(r.balance)}</td>
     </tr>`;
   }).join('');
-}
-
-function drawChart(labels, balData) {
-  if (chartInstance) chartInstance.destroy();
-  const color = mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
-  const bg = mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
-
-  chartInstance = new Chart(document.getElementById('chart'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{ label: 'Balance', data: balData, borderColor: color, backgroundColor: bg, fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
-          titleColor: '#d1d5db', bodyColor: '#fff',
-          callbacks: { label: c => ' Balance: $' + c.parsed.y.toLocaleString() }
-        }
-      },
-      scales: {
-        x: { ticks: { maxTicksLimit: 10, color: '#6b7280', font: { size: 11 }, maxRotation: 45 }, grid: { color: '#1f2937' } },
-        y: { beginAtZero: true, ticks: { callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v), color: '#6b7280', font: { size: 11 } }, grid: { color: '#1f2937' } }
-      }
-    }
-  });
 }
 
 calculate();

@@ -48,6 +48,49 @@ The 14 derived annual returns are:
 ### Monte Carlo
 Takes the same 14 historical returns but draws them in a random order, refilling and reshuffling the pool every 14 years. Hit **Reshuffle ↺** to run a new scenario. This approximates a Monte Carlo simulation using empirically grounded return values rather than synthetic distributions — so the range of outcomes is realistic rather than theoretical.
 
+Click **Run Analysis ▶** to run 500 shuffles at once and see the full distribution of outcomes (see [Monte Carlo Distribution Analysis](#monte-carlo-distribution-analysis) below).
+
+---
+
+---
+
+## Monte Carlo Distribution Analysis
+
+Available only in Monte Carlo mode. Click **Run Analysis ▶** to run 500 independent shuffles against your current inputs and visualize the spread of outcomes.
+
+### Summary cards
+
+| Card | Description |
+|------|-------------|
+| Survived 30 yrs | Percentage of runs where the portfolio lasted the full 30 years. Green ≥ 80%, blue ≥ 50%, red below 50%. |
+| Median final bal | 50th-percentile ending balance across all 500 runs |
+| Earliest depletion | The earliest year any run depleted (worst case) |
+| Best outcome | Highest final balance among runs that survived |
+
+### Fan chart
+
+The main balance chart switches from a single line to a **percentile band** showing the 10th, median, and 90th percentile balance at each year across all 500 runs. The shaded band between the dashed lines represents the middle 80% of outcomes.
+
+### Scatter plot — two views
+
+**Outcome tab**
+- X-axis: final balance at year 30 (0 for depleted runs)
+- Y-axis: total interest earned over 30 years
+- Green dots = survived · Red dots = depleted
+- Clusters near the origin are depleted runs; runs that survive and compound heavily appear in the upper right
+
+**Timeline tab**
+- Runs sorted by final balance ascending (rank on X-axis)
+- Y-axis: year depleted (30 = survived)
+- Shows the "cliff" where runs transition from survived to depleted as returns get worse
+- Useful for seeing how many runs clustered near the depletion threshold
+
+### Clicking a dot
+
+Click any dot on the scatter plot to load that specific shuffle into the main chart, stat cards, and yearly breakdown table. A note at the bottom of the scatter identifies which run you're viewing and its outcome. Click **Reshuffle ↺** or **Run Analysis ▶** to return to the distribution view.
+
+Changing any input while analysis is active automatically clears the analysis results.
+
 ---
 
 ## Inputs
@@ -66,7 +109,7 @@ Takes the same 14 historical returns but draws them in a random order, refilling
 
 **Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, and SS income received if applicable.
 
-**Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Monte Carlo).
+**Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Monte Carlo). In Monte Carlo mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line.
 
 **Yearly breakdown table** — year-by-year detail including:
 - Sequence year (historical and Monte Carlo modes)
@@ -84,6 +127,8 @@ Takes the same 14 historical returns but draws them in a random order, refilling
 ## How returns are applied
 
 Each year's annual return is converted to a monthly compounding rate (`(1 + r)^(1/12) - 1`) and applied month by month. Withdrawals and SS income are processed each month against the current balance — so the timing of gains and losses within a year affects the result, rather than treating it as a year-end lump sum.
+
+Social Security income offsets the portfolio withdrawal each month: only `max(0, monthly spend − SS payment)` is drawn from the portfolio once SS begins. If SS fully covers monthly expenses, the portfolio is not drawn down at all during those months.
 
 ---
 
