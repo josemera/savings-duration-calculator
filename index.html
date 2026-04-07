@@ -315,8 +315,8 @@ function calculate() {
       const ss = (ssAmount > 0 && globalMonth >= ssDelay) ? ssAmount : 0;
       yearInterest += interest;
       yearSS += ss;
-      yearWithdraw += monthly;
-      balance = Math.max(0, balance + interest + ss - monthly);
+      yearWithdraw += Math.max(0, monthly - ss);
+      balance = Math.max(0, balance + interest - Math.max(0, monthly - ss));
     }
 
     const netChange = balance - startBalance;
