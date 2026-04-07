@@ -45,18 +45,20 @@ The 14 derived annual returns are:
 | 6   | +21.2% | | 13  | +34.1% |
 | 7   | −3.8%  | | 14  | +21.5% |
 
-### Monte Carlo
-Takes the same 14 historical returns but draws them in a random order, refilling and reshuffling the pool every 14 years. Hit **Reshuffle ↺** to run a new scenario. This approximates a Monte Carlo simulation using empirically grounded return values rather than synthetic distributions — so the range of outcomes is realistic rather than theoretical.
+### Random Sequence
+Takes the same 14 historical returns but draws them in a random order, refilling and reshuffling the pool every 14 years. Hit **Reshuffle ↺** to run a new scenario.
 
-Click **Run Analysis ▶** to run 500 shuffles at once and see the full distribution of outcomes (see [Monte Carlo Distribution Analysis](#monte-carlo-distribution-analysis) below).
+This is **bootstrapped resampling**, not a traditional Monte Carlo simulation. A true Monte Carlo would draw returns from a probability distribution (e.g., a normal distribution with a given mean and standard deviation), potentially generating values never seen in history. This approach only ever uses returns that actually occurred — so the outcome range is bounded by real historical experience rather than theoretical tails.
+
+Click **Run Analysis ▶** to run 500 shuffles at once and see the full distribution of outcomes (see [Random Sequence Distribution Analysis](#random-sequence-distribution-analysis) below).
 
 ---
 
 ---
 
-## Monte Carlo Distribution Analysis
+## Random Sequence Distribution Analysis
 
-Available only in Monte Carlo mode. Click **Run Analysis ▶** to run 500 independent shuffles against your current inputs and visualize the spread of outcomes.
+Available only in Random Sequence mode. Click **Run Analysis ▶** to run 500 independent shuffles against your current inputs and visualize the spread of outcomes.
 
 ### Summary cards
 
@@ -109,10 +111,10 @@ Changing any input while analysis is active automatically clears the analysis re
 
 **Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, and SS income received if applicable.
 
-**Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Monte Carlo). In Monte Carlo mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line.
+**Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Random Sequence). In Random Sequence mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line.
 
 **Yearly breakdown table** — year-by-year detail including:
-- Sequence year (historical and Monte Carlo modes)
+- Sequence year (historical and Random Sequence modes)
 - Annual return applied
 - Interest earned
 - SS income received

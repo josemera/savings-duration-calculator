@@ -124,7 +124,7 @@
 <body>
 <div class="container">
   <h1>Savings Duration Calculator</h1>
-  <p class="subtitle">How long will your savings last? Model with a fixed rate, historical sequence, or Monte Carlo simulation.</p>
+  <p class="subtitle">How long will your savings last? Model with a fixed rate, historical sequence, or random sequence simulation.</p>
 
   <!-- Mode toggle -->
   <div class="mode-row">
@@ -132,7 +132,7 @@
     <div class="toggle-group">
       <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
       <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical sequence</button>
-      <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Monte Carlo</button>
+      <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Random Sequence</button>
     </div>
   </div>
 
@@ -162,10 +162,10 @@
       <p class="mode-note">Uses 14 historical annual returns in order, cycling after year 14.</p>
     </div>
 
-    <!-- Monte Carlo panel -->
+    <!-- Random Sequence panel -->
     <div id="rand-panel" style="display:none;">
       <div class="control-row" style="margin-bottom:0;">
-        <p class="mode-note" style="flex:1;">14 historical returns drawn in random order, refilling each cycle.</p>
+        <p class="mode-note" style="flex:1;">Bootstrapped historical returns — 14 real returns drawn in random order, refilling each cycle.</p>
         <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
         <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
       </div>
