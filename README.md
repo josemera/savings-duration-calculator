@@ -54,8 +54,6 @@ Click **Run Analysis ▶** to run 500 shuffles at once and see the full distribu
 
 ---
 
----
-
 ## Random Sequence Distribution Analysis
 
 Available only in Random Sequence mode. Click **Run Analysis ▶** to run 500 independent shuffles against your current inputs and visualize the spread of outcomes.
@@ -95,32 +93,58 @@ Changing any input while analysis is active automatically clears the analysis re
 
 ---
 
+## Inflation Adjustment
+
+An optional toggle in the controls panel. When enabled, a slider sets the annual inflation rate (0–10%, default 3.0%).
+
+### What it adjusts
+
+**Monthly spend** grows each year by the inflation rate. A $4,000/month baseline becomes ~$4,120 in year 1, ~$5,418 in year 10, and ~$9,700 in year 30 at 3% — reflecting the real cost of maintaining the same lifestyle.
+
+**Social Security income** also grows at the inflation rate, starting from year 0 in today's dollars. This matches how SS Cost of Living Adjustments (COLA) work by law: the benefit accrues real value from the day you enter it, even during the delay period before payments begin. A $2,000/month SS benefit entered today will be worth ~$2,312/month when it starts five years from now.
+
+### Why this doesn't double-count returns
+
+The 14 historical returns used by this calculator are **nominal** — inflation was already embedded in the market performance of those years. Applying a separate inflation rate to spending is therefore correct: you're modeling a portfolio that grows at historical nominal rates while expenses rise in nominal terms alongside them.
+
+### Real value outputs
+
+When inflation is active, two additional outputs appear:
+
+- **Real value at yr 30 stat card** — the nominal final balance deflated back to today's purchasing power. At 3% inflation over 30 years, a nominal $800k is worth roughly $330k in today's dollars (× 0.41).
+- **Real value column in the yearly breakdown table** — each year's ending balance expressed in today's dollars, shown alongside the nominal balance.
+- **Chart tooltip** — hovering over any year on the single-run balance chart shows both the nominal balance and its real value in today's dollars.
+
+---
+
 ## Inputs
 
 | Input | Description |
 |-------|-------------|
 | Starting capital | Your initial portfolio value in dollars |
-| Monthly spend | Fixed monthly withdrawal amount |
+| Monthly spend | Your spending in today's dollars (grown by inflation if enabled) |
 | Annual rate | Fixed return rate (Fixed rate mode only) |
-| SS payment | Optional monthly Social Security income |
+| SS payment | Monthly Social Security income in today's dollars |
 | SS starts in | How many months until SS payments begin (slider, 0–120) |
+| Inflation adjustment | Optional toggle to enable inflation. Slider sets annual rate (default 3.0%) |
 
 ---
 
 ## Output
 
-**Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, and SS income received if applicable.
+**Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, SS income received if applicable, and real value in today's dollars if inflation is enabled.
 
-**Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Random Sequence). In Random Sequence mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line.
+**Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Random Sequence). In Random Sequence mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line. When inflation is enabled, hovering over any point shows both the nominal balance and its real value in today's dollars.
 
 **Yearly breakdown table** — year-by-year detail including:
 - Sequence year (historical and Random Sequence modes)
 - Annual return applied
 - Interest earned
-- SS income received
-- Total withdrawals
+- SS income received (inflation-adjusted when enabled)
+- Total withdrawals (inflation-adjusted when enabled)
 - Net change
 - Ending balance
+- Real value in today's dollars (when inflation is enabled)
 
 **Sequence reference table** — visible in historical sequence mode, shows all 14 source returns with their original cumulative values for reference.
 

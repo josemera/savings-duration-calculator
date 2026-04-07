@@ -184,6 +184,28 @@
         oninput="document.getElementById('ssVal').textContent=this.value+' mo';onInputChange()" />
       <span class="range-val" id="ssVal">0 mo</span>
     </div>
+
+    <hr class="divider">
+
+    <!-- Inflation -->
+    <div class="control-row" style="margin-bottom:0;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="inflation-toggle" onchange="onInflationToggle()"
+          style="width:15px;height:15px;cursor:pointer;accent-color:#a78bfa;" />
+        Inflation adjustment
+      </label>
+    </div>
+    <div id="inflation-panel" style="display:none;">
+      <div class="control-row" style="margin-top:14px;">
+        <label>Annual inflation rate (%)</label>
+        <input type="range" min="0" max="10" step="0.1" value="3.0" id="inflation-rate"
+          oninput="document.getElementById('inflationVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
+        <span class="range-val" id="inflationVal">3.0%</span>
+      </div>
+      <p class="mode-note" style="margin-bottom:0;padding-bottom:2px;">
+        Spending and SS grow at this rate annually. Returns are nominal — no double-counting.
+      </p>
+    </div>
   </div>
 
   <!-- Stat cards (single run) -->
@@ -214,7 +236,7 @@
 
   <!-- Yearly table -->
   <div class="table-wrap">
-    <div class="table-title">Yearly breakdown</div>
+    <div class="table-title" id="yr-table-title">Yearly breakdown</div>
     <div class="scroll">
       <table>
         <thead>
@@ -227,6 +249,7 @@
             <th>Withdrawals</th>
             <th>Net change</th>
             <th>Balance</th>
+            <th id="th-real" style="display:none;">Real value</th>
           </tr>
         </thead>
         <tbody id="yr-tbody"></tbody>
@@ -316,6 +339,12 @@ function onInputChange() {
   calculate();
 }
 
+function onInflationToggle() {
+  const on = document.getElementById('inflation-toggle').checked;
+  document.getElementById('inflation-panel').style.display = on ? '' : 'none';
+  onInputChange();
+}
+
 function reshuffle() {
   shuffledSequence = buildFullRandomSequence();
   resetAnalysis();
@@ -362,7 +391,7 @@ function buildSeqTable() {
 
 // ─── Core simulation ─────────────────────────────────────────────────────────
 
-function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate) {
+function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate = 0) {
   const balData = [capital];
   const yearRows = [];
   let balance = capital;
@@ -383,7 +412,10 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate) {
       annualReturn = entry.r; seqYr = entry.origIdx;
     }
 
-    const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
+    const monthlyRate   = Math.pow(1 + annualReturn, 1/12) - 1;
+    const inflFactor    = Math.pow(1 + inflationRate, y);
+    const adjustedSpend = monthly  * inflFactor;   // spend grows with inflation each year
+    const adjustedSS    = ssAmount * inflFactor;   // SS grows from today's dollars (COLA from yr 0)
     let yearInterest = 0, yearSS = 0, yearWithdraw = 0;
     const startBalance = balance;
 
@@ -391,11 +423,11 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate) {
       if (balance <= 0) break;
       const globalMonth = y * 12 + m;
       const interest = balance * monthlyRate;
-      const ss = (ssAmount > 0 && globalMonth >= ssDelay) ? ssAmount : 0;
+      const ss = (adjustedSS > 0 && globalMonth >= ssDelay) ? adjustedSS : 0;
       yearInterest += interest;
       yearSS += ss;
-      yearWithdraw += Math.max(0, monthly - ss);
-      balance = Math.max(0, balance + interest - Math.max(0, monthly - ss));
+      yearWithdraw += Math.max(0, adjustedSpend - ss);
+      balance = Math.max(0, balance + interest - Math.max(0, adjustedSpend - ss));
     }
 
     const netChange = balance - startBalance;
@@ -416,15 +448,17 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate) {
 // ─── Single-run calculate ────────────────────────────────────────────────────
 
 function calculate() {
-  const capital   = parseFloat(document.getElementById('capital').value)   || 0;
-  const monthly   = parseFloat(document.getElementById('monthly').value)   || 0;
-  const ssAmount  = parseFloat(document.getElementById('ss-amount').value) || 0;
-  const ssDelay   = parseInt(document.getElementById('ss-delay').value)    || 0;
-  const fixedRate = parseFloat(document.getElementById('rate').value) / 100;
+  const capital       = parseFloat(document.getElementById('capital').value)   || 0;
+  const monthly       = parseFloat(document.getElementById('monthly').value)   || 0;
+  const ssAmount      = parseFloat(document.getElementById('ss-amount').value) || 0;
+  const ssDelay       = parseInt(document.getElementById('ss-delay').value)    || 0;
+  const fixedRate     = parseFloat(document.getElementById('rate').value) / 100;
+  const inflationOn   = document.getElementById('inflation-toggle').checked;
+  const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
   if (capital <= 0 || monthly <= 0) return;
 
   const { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal } =
-    simulateSequence(capital, monthly, ssAmount, ssDelay, shuffledSequence, fixedRate);
+    simulateSequence(capital, monthly, ssAmount, ssDelay, shuffledSequence, fixedRate, inflationRate);
 
   // Build labels
   const labels = ['Start'];
@@ -444,37 +478,43 @@ function calculate() {
     `;
   } else {
     const gainPct = ((finalBal / capital) - 1) * 100;
+    const realValCard = inflationRate > 0
+      ? `<div class="card"><div class="card-label">Real value at yr 30</div><div class="card-value purple">$${fmt0(finalBal / Math.pow(1 + inflationRate, MAX_YEARS))} <span style="font-size:11px;font-weight:400;color:#6b7280">today's $</span></div></div>`
+      : '';
     cards.innerHTML = `
       <div class="card"><div class="card-label">Balance at yr 30</div><div class="card-value green">$${fmt0(finalBal)}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
       <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
+      ${realValCard}
       ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
     `;
   }
 
-  buildYearTable(yearRows, ssAmount > 0);
+  buildYearTable(yearRows, ssAmount > 0, inflationRate);
 
   if (mcAnalysisActive && mcRuns.length > 0) {
     drawFanChart();
   } else {
-    drawChart(labels, balData);
+    drawChart(labels, balData, inflationRate);
   }
 }
 
 // ─── MC Analysis ─────────────────────────────────────────────────────────────
 
 function runMonteCarloAnalysis() {
-  const capital   = parseFloat(document.getElementById('capital').value)   || 0;
-  const monthly   = parseFloat(document.getElementById('monthly').value)   || 0;
-  const ssAmount  = parseFloat(document.getElementById('ss-amount').value) || 0;
-  const ssDelay   = parseInt(document.getElementById('ss-delay').value)    || 0;
-  const fixedRate = parseFloat(document.getElementById('rate').value) / 100;
+  const capital       = parseFloat(document.getElementById('capital').value)   || 0;
+  const monthly       = parseFloat(document.getElementById('monthly').value)   || 0;
+  const ssAmount      = parseFloat(document.getElementById('ss-amount').value) || 0;
+  const ssDelay       = parseInt(document.getElementById('ss-delay').value)    || 0;
+  const fixedRate     = parseFloat(document.getElementById('rate').value) / 100;
+  const inflationOn   = document.getElementById('inflation-toggle').checked;
+  const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
   if (capital <= 0 || monthly <= 0) return;
 
   mcRuns = [];
   for (let i = 0; i < 500; i++) {
     const seq = buildFullRandomSequence();
-    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate);
+    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate);
     mcRuns.push({ seq, ...result });
   }
 
@@ -673,7 +713,7 @@ function drawScatter(tab) {
 
 // ─── Single-run chart ────────────────────────────────────────────────────────
 
-function drawChart(labels, balData) {
+function drawChart(labels, balData, inflationRate = 0) {
   if (chartInstance) chartInstance.destroy();
   const color = mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
   const bg    = mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
@@ -691,7 +731,17 @@ function drawChart(labels, balData) {
         tooltip: {
           backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
           titleColor: '#d1d5db', bodyColor: '#fff',
-          callbacks: { label: c => ' Balance: $' + c.parsed.y.toLocaleString() }
+          callbacks: {
+            label: c => {
+              const nominal = c.parsed.y;
+              const lines = [' Balance: $' + nominal.toLocaleString()];
+              if (inflationRate > 0 && c.dataIndex > 0) {
+                const real = Math.round(nominal / Math.pow(1 + inflationRate, c.dataIndex));
+                lines.push(` Real value: $${real.toLocaleString()} today's $`);
+              }
+              return lines;
+            }
+          }
         }
       },
       scales: {
@@ -704,15 +754,23 @@ function drawChart(labels, balData) {
 
 // ─── Year table ──────────────────────────────────────────────────────────────
 
-function buildYearTable(rows, showSS) {
-  document.getElementById('th-ss').style.display  = showSS ? '' : 'none';
-  document.getElementById('th-seq').style.display = (mode === 'seq' || mode === 'rand') ? '' : 'none';
+function buildYearTable(rows, showSS, inflationRate = 0) {
+  const showInflation = inflationRate > 0;
+  document.getElementById('th-ss').style.display   = showSS ? '' : 'none';
+  document.getElementById('th-seq').style.display  = (mode === 'seq' || mode === 'rand') ? '' : 'none';
+  document.getElementById('th-real').style.display = showInflation ? '' : 'none';
+  document.getElementById('yr-table-title').innerHTML = showInflation
+    ? 'Yearly breakdown <span style="font-size:11px;font-weight:400;color:#6b7280;">(inflation-adjusted spend &amp; SS)</span>'
+    : 'Yearly breakdown';
 
   document.getElementById('yr-tbody').innerHTML = rows.map(r => {
-    const retCls = r.annualReturn >= 0 ? 'green' : 'red';
-    const netCls = r.netChange    >= 0 ? 'green' : 'red';
-    const seqTd  = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
-    const ssTd   = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
+    const retCls  = r.annualReturn >= 0 ? 'green' : 'red';
+    const netCls  = r.netChange    >= 0 ? 'green' : 'red';
+    const seqTd   = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
+    const ssTd    = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
+    const realTd  = showInflation
+      ? `<td class="muted">${fmtD(r.balance / Math.pow(1 + inflationRate, r.year))}</td>`
+      : '';
     return `<tr>
       <td style="text-align:left;">${r.year}</td>
       ${seqTd}
@@ -722,6 +780,7 @@ function buildYearTable(rows, showSS) {
       <td>${fmtD(r.yearWithdraw)}</td>
       <td class="${netCls}">${fmtD(r.netChange)}</td>
       <td>${fmtD(r.balance)}</td>
+      ${realTd}
     </tr>`;
   }).join('');
 }
