@@ -94,6 +94,8 @@
   td:first-child { text-align: left; color: #9ca3af; }
   tr:hover td { background: #1a2433; }
   .green { color: #4ade80; } .red { color: #f87171; } .blue { color: #60a5fa; } .muted { color: #6b7280; }
+  tr.guardrail-boost td { background: rgba(52,211,153,0.08); }
+  tr.guardrail-cut   td { background: rgba(248,113,113,0.08); }
 
   /* Sequence ref table */
   .seq-ref { margin-top: 20px; }
@@ -206,6 +208,20 @@
         Spending and SS grow at this rate annually. Returns are nominal — no double-counting.
       </p>
     </div>
+
+    <!-- Guardrails -->
+    <div class="control-row" style="margin-bottom:0;margin-top:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="guardrails-toggle" onchange="onGuardrailsToggle()"
+          style="width:15px;height:15px;cursor:pointer;accent-color:#a78bfa;" />
+        Spending guardrails
+      </label>
+    </div>
+    <div id="guardrails-panel" style="display:none;">
+      <p class="mode-note" style="margin-bottom:0;padding-bottom:2px;margin-top:10px;">
+        Guyton-Klinger: cut 10% if withdrawal rate rises above 120% of initial; boost 10% if it drops below 80%.
+      </p>
+    </div>
   </div>
 
   <!-- Stat cards (single run) -->
@@ -250,6 +266,7 @@
             <th>Net change</th>
             <th>Balance</th>
             <th id="th-real" style="display:none;">Real value</th>
+            <th id="th-guardrail" style="display:none;">Spend/mo</th>
           </tr>
         </thead>
         <tbody id="yr-tbody"></tbody>
@@ -345,6 +362,12 @@ function onInflationToggle() {
   onInputChange();
 }
 
+function onGuardrailsToggle() {
+  const on = document.getElementById('guardrails-toggle').checked;
+  document.getElementById('guardrails-panel').style.display = on ? '' : 'none';
+  onInputChange();
+}
+
 function reshuffle() {
   shuffledSequence = buildFullRandomSequence();
   resetAnalysis();
@@ -391,12 +414,14 @@ function buildSeqTable() {
 
 // ─── Core simulation ─────────────────────────────────────────────────────────
 
-function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate = 0) {
+function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate = 0, guardrailsOn = false) {
   const balData = [capital];
   const yearRows = [];
   let balance = capital;
   let depleted = false;
   let depletedYear = null;
+  const IWR = guardrailsOn ? (monthly * 12) / capital : null;
+  let guardrailSpend = guardrailsOn ? monthly : null;
 
   for (let y = 0; y < MAX_YEARS; y++) {
     if (balance <= 0) { depleted = true; depletedYear = y; break; }
@@ -414,7 +439,14 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, i
 
     const monthlyRate   = Math.pow(1 + annualReturn, 1/12) - 1;
     const inflFactor    = Math.pow(1 + inflationRate, y);
-    const adjustedSpend = monthly  * inflFactor;   // spend grows with inflation each year
+    if (guardrailsOn && y > 0) guardrailSpend *= (1 + inflationRate);
+    let guardrailEvent = null;
+    if (guardrailsOn && balance > 0) {
+      const CWR = (guardrailSpend * 12) / balance;
+      if (CWR < 0.8 * IWR)       { guardrailSpend *= 1.10; guardrailEvent = 'boost'; }
+      else if (CWR > 1.2 * IWR)  { guardrailSpend *= 0.90; guardrailEvent = 'cut'; }
+    }
+    const adjustedSpend = guardrailsOn ? guardrailSpend : monthly * inflFactor;
     const adjustedSS    = ssAmount * inflFactor;   // SS grows from today's dollars (COLA from yr 0)
     let yearInterest = 0, yearSS = 0, yearWithdraw = 0;
     const startBalance = balance;
@@ -431,7 +463,8 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, i
     }
 
     const netChange = balance - startBalance;
-    yearRows.push({ year: y+1, seqYr, annualReturn, yearInterest, yearSS, yearWithdraw, netChange, balance });
+    yearRows.push({ year: y+1, seqYr, annualReturn, yearInterest, yearSS, yearWithdraw, netChange, balance,
+      monthlySpend: guardrailsOn ? guardrailSpend : null, guardrailEvent });
     balData.push(Math.round(balance));
   }
 
@@ -455,10 +488,11 @@ function calculate() {
   const fixedRate     = parseFloat(document.getElementById('rate').value) / 100;
   const inflationOn   = document.getElementById('inflation-toggle').checked;
   const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
+  const guardrailsOn  = document.getElementById('guardrails-toggle').checked;
   if (capital <= 0 || monthly <= 0) return;
 
   const { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal } =
-    simulateSequence(capital, monthly, ssAmount, ssDelay, shuffledSequence, fixedRate, inflationRate);
+    simulateSequence(capital, monthly, ssAmount, ssDelay, shuffledSequence, fixedRate, inflationRate, guardrailsOn);
 
   // Build labels
   const labels = ['Start'];
@@ -470,11 +504,17 @@ function calculate() {
 
   // Stat cards
   const cards = document.getElementById('cards');
+  const boosts = guardrailsOn ? yearRows.filter(r => r.guardrailEvent === 'boost').length : 0;
+  const cuts   = guardrailsOn ? yearRows.filter(r => r.guardrailEvent === 'cut').length   : 0;
+  const guardrailCard = guardrailsOn
+    ? `<div class="card"><div class="card-label">Guardrail events</div><div class="card-value">${boosts} boost${boosts!==1?'s':''} / ${cuts} cut${cuts!==1?'s':''}</div></div>`
+    : '';
   if (depleted) {
     cards.innerHTML = `
       <div class="card"><div class="card-label">Depleted at</div><div class="card-value red">Yr ${depletedYear}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
       ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
+      ${guardrailCard}
     `;
   } else {
     const gainPct = ((finalBal / capital) - 1) * 100;
@@ -487,10 +527,11 @@ function calculate() {
       <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
       ${realValCard}
       ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
+      ${guardrailCard}
     `;
   }
 
-  buildYearTable(yearRows, ssAmount > 0, inflationRate);
+  buildYearTable(yearRows, ssAmount > 0, inflationRate, guardrailsOn);
 
   if (mcAnalysisActive && mcRuns.length > 0) {
     drawFanChart();
@@ -509,12 +550,13 @@ function runMonteCarloAnalysis() {
   const fixedRate     = parseFloat(document.getElementById('rate').value) / 100;
   const inflationOn   = document.getElementById('inflation-toggle').checked;
   const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
+  const guardrailsOn  = document.getElementById('guardrails-toggle').checked;
   if (capital <= 0 || monthly <= 0) return;
 
   mcRuns = [];
   for (let i = 0; i < 500; i++) {
     const seq = buildFullRandomSequence();
-    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate);
+    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate, guardrailsOn);
     mcRuns.push({ seq, ...result });
   }
 
@@ -754,24 +796,29 @@ function drawChart(labels, balData, inflationRate = 0) {
 
 // ─── Year table ──────────────────────────────────────────────────────────────
 
-function buildYearTable(rows, showSS, inflationRate = 0) {
+function buildYearTable(rows, showSS, inflationRate = 0, guardrailsOn = false) {
   const showInflation = inflationRate > 0;
-  document.getElementById('th-ss').style.display   = showSS ? '' : 'none';
-  document.getElementById('th-seq').style.display  = (mode === 'seq' || mode === 'rand') ? '' : 'none';
-  document.getElementById('th-real').style.display = showInflation ? '' : 'none';
+  document.getElementById('th-ss').style.display        = showSS ? '' : 'none';
+  document.getElementById('th-seq').style.display       = (mode === 'seq' || mode === 'rand') ? '' : 'none';
+  document.getElementById('th-real').style.display      = showInflation ? '' : 'none';
+  document.getElementById('th-guardrail').style.display = guardrailsOn ? '' : 'none';
   document.getElementById('yr-table-title').innerHTML = showInflation
     ? 'Yearly breakdown <span style="font-size:11px;font-weight:400;color:#6b7280;">(inflation-adjusted spend &amp; SS)</span>'
     : 'Yearly breakdown';
 
   document.getElementById('yr-tbody').innerHTML = rows.map(r => {
-    const retCls  = r.annualReturn >= 0 ? 'green' : 'red';
-    const netCls  = r.netChange    >= 0 ? 'green' : 'red';
-    const seqTd   = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
-    const ssTd    = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
-    const realTd  = showInflation
+    const retCls      = r.annualReturn >= 0 ? 'green' : 'red';
+    const netCls      = r.netChange    >= 0 ? 'green' : 'red';
+    const rowClass    = r.guardrailEvent === 'boost' ? ' class="guardrail-boost"'
+                      : r.guardrailEvent === 'cut'   ? ' class="guardrail-cut"'
+                      : '';
+    const seqTd       = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
+    const ssTd        = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
+    const realTd      = showInflation
       ? `<td class="muted">${fmtD(r.balance / Math.pow(1 + inflationRate, r.year))}</td>`
       : '';
-    return `<tr>
+    const guardrailTd = guardrailsOn ? `<td>${fmtD(r.monthlySpend)}</td>` : '';
+    return `<tr${rowClass}>
       <td style="text-align:left;">${r.year}</td>
       ${seqTd}
       <td class="${retCls}">${fmtPct(r.annualReturn * 100)}</td>
@@ -781,6 +828,7 @@ function buildYearTable(rows, showSS, inflationRate = 0) {
       <td class="${netCls}">${fmtD(r.netChange)}</td>
       <td>${fmtD(r.balance)}</td>
       ${realTd}
+      ${guardrailTd}
     </tr>`;
   }).join('');
 }
