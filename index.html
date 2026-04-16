@@ -117,6 +117,31 @@
     border-top: 1px solid #1e1541; background: #060a12;
   }
 
+  /* Safe withdrawal finder */
+  .finder-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid #1f2937; }
+  .finder-row { display: flex; align-items: center; gap: 10px; }
+  .finder-label { color: #9ca3af; font-size: 12px; white-space: nowrap; }
+  .finder-select {
+    background: #1f2937; color: #d1d5db; border: 1px solid #374151;
+    border-radius: 6px; padding: 5px 10px; font-size: 13px; font-weight: 600; cursor: pointer; outline: none;
+  }
+  .finder-btn {
+    padding: 6px 14px; background: #1c3a2a; color: #4ade80; border: 1px solid #15803d;
+    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .finder-btn:hover { background: #14532d; color: #86efac; }
+  .finder-result { margin-top: 12px; }
+  .finder-card {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: #0d1f15; border: 1px solid #15803d; border-radius: 10px; padding: 12px 16px;
+  }
+  .finder-card > div { min-width: 130px; }
+  .apply-btn {
+    padding: 6px 14px; background: #14532d; color: #4ade80; border: 1px solid #15803d;
+    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; margin-left: auto;
+  }
+  .apply-btn:hover { background: #166534; color: #86efac; }
+
   @media (max-width: 600px) {
     .control-row { flex-wrap: wrap; }
     .control-row label { min-width: 100%; }
@@ -130,11 +155,22 @@
 
   <!-- Mode toggle -->
   <div class="mode-row">
-    <span class="mode-label">Return mode</span>
+    <span class="mode-label" style="min-width:90px;">Return mode</span>
     <div class="toggle-group">
       <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
       <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical sequence</button>
       <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Random Sequence</button>
+    </div>
+  </div>
+  <div class="mode-row">
+    <span class="mode-label" style="min-width:90px;">Horizon</span>
+    <div class="toggle-group">
+      <button class="toggle-btn" id="btn-h10" onclick="setHorizon(10)">10 yr</button>
+      <button class="toggle-btn" id="btn-h15" onclick="setHorizon(15)">15 yr</button>
+      <button class="toggle-btn" id="btn-h20" onclick="setHorizon(20)">20 yr</button>
+      <button class="toggle-btn" id="btn-h25" onclick="setHorizon(25)">25 yr</button>
+      <button class="toggle-btn active" id="btn-h30" onclick="setHorizon(30)">30 yr</button>
+      <button class="toggle-btn" id="btn-h40" onclick="setHorizon(40)">40 yr</button>
     </div>
   </div>
 
@@ -170,6 +206,21 @@
         <p class="mode-note" style="flex:1;">Bootstrapped historical returns — 14 real returns drawn in random order, refilling each cycle.</p>
         <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
         <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
+      </div>
+      <div class="finder-section">
+        <div class="finder-row">
+          <span class="finder-label">What can I safely spend?</span>
+          <select id="finder-target" class="finder-select">
+            <option value="99">99% survival</option>
+            <option value="95">95% survival</option>
+            <option value="90" selected>90% survival</option>
+            <option value="85">85% survival</option>
+            <option value="80">80% survival</option>
+            <option value="75">75% survival</option>
+          </select>
+          <button class="finder-btn" onclick="findSafeWithdrawal()">Find ▶</button>
+        </div>
+        <div id="finder-result" style="display:none;"></div>
       </div>
     </div>
 
@@ -305,7 +356,7 @@ const ANNUAL_RETURNS = (() => {
   return r;
 })();
 
-const MAX_YEARS = 30;
+let MAX_YEARS = 30;
 let mode = 'fixed';
 let chartInstance = null;
 let scatterInstance = null;
@@ -374,12 +425,102 @@ function reshuffle() {
   calculate();
 }
 
+function findSafeWithdrawal() {
+  const capital      = parseFloat(document.getElementById('capital').value)    || 0;
+  const ssAmount     = parseFloat(document.getElementById('ss-amount').value)  || 0;
+  const ssDelay      = parseInt(document.getElementById('ss-delay').value)     || 0;
+  const inflationOn  = document.getElementById('inflation-toggle').checked;
+  const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
+  const guardrailsOn = document.getElementById('guardrails-toggle').checked;
+  const target       = parseFloat(document.getElementById('finder-target').value) / 100;
+  if (capital <= 0) return;
+
+  const resultEl = document.getElementById('finder-result');
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<span style="color:#6b7280;font-size:12px;">Searching\u2026</span>';
+
+  setTimeout(() => {
+    const RUNS = 500;
+
+    function survivalRate(spend) {
+      let survived = 0;
+      for (let i = 0; i < RUNS; i++) {
+        const seq = buildFullRandomSequence();
+        const r = simulateSequence(capital, spend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn);
+        if (!r.depleted) survived++;
+      }
+      return survived / RUNS;
+    }
+
+    // Check if even $1/mo is viable
+    if (survivalRate(1) < target) {
+      resultEl.innerHTML = `<span style="color:#f87171;font-size:13px;">Cannot meet ${Math.round(target*100)}% survival target with current capital.</span>`;
+      return;
+    }
+
+    // Binary search
+    let lo = 1, hi = Math.min(50000, Math.floor(capital / 12));
+    let bestSpend = 1;
+    while (hi - lo > 50) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (survivalRate(mid) >= target) { bestSpend = mid; lo = mid + 1; }
+      else { hi = mid - 1; }
+    }
+    // Fine-tune within the remaining window
+    for (let s = lo; s <= hi; s += 10) {
+      if (survivalRate(s) >= target) bestSpend = s;
+      else break;
+    }
+
+    // Verification run for displayed rate
+    let verifiedSurvived = 0;
+    for (let i = 0; i < RUNS; i++) {
+      const seq = buildFullRandomSequence();
+      const r = simulateSequence(capital, bestSpend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn);
+      if (!r.depleted) verifiedSurvived++;
+    }
+    displayFinderResult(bestSpend, verifiedSurvived, RUNS);
+  }, 20);
+}
+
+function displayFinderResult(spend, survived, total) {
+  const pct = (survived / total * 100).toFixed(1);
+  document.getElementById('finder-result').innerHTML = `
+    <div class="finder-card">
+      <div>
+        <div class="card-label">Max safe spend</div>
+        <div class="card-value green">$${fmt0(spend)} <span style="font-size:11px;font-weight:400;color:#6b7280;">/ mo</span></div>
+      </div>
+      <div>
+        <div class="card-label">Survival rate</div>
+        <div class="card-value">${pct}% <span style="font-size:11px;font-weight:400;color:#6b7280;">(${survived}/${total} runs)</span></div>
+      </div>
+      <button class="apply-btn" onclick="applyFinderResult(${spend})">Apply to inputs</button>
+    </div>`;
+}
+
+function applyFinderResult(spend) {
+  document.getElementById('monthly').value = spend;
+  onInputChange();
+}
+
 function resetAnalysis() {
   mcRuns = [];
   mcAnalysisActive = false;
   viewingRunIdx = null;
   document.getElementById('mc-analysis').style.display = 'none';
   if (scatterInstance) { scatterInstance.destroy(); scatterInstance = null; }
+  const finderResult = document.getElementById('finder-result');
+  if (finderResult) finderResult.style.display = 'none';
+}
+
+function setHorizon(n) {
+  MAX_YEARS = n;
+  [10, 15, 20, 25, 30, 40].forEach(y =>
+    document.getElementById('btn-h' + y).classList.toggle('active', y === n)
+  );
+  resetAnalysis();
+  calculate();
 }
 
 function setMode(m) {
@@ -519,10 +660,10 @@ function calculate() {
   } else {
     const gainPct = ((finalBal / capital) - 1) * 100;
     const realValCard = inflationRate > 0
-      ? `<div class="card"><div class="card-label">Real value at yr 30</div><div class="card-value purple">$${fmt0(finalBal / Math.pow(1 + inflationRate, MAX_YEARS))} <span style="font-size:11px;font-weight:400;color:#6b7280">today's $</span></div></div>`
+      ? `<div class="card"><div class="card-label">Real value at yr ${MAX_YEARS}</div><div class="card-value purple">$${fmt0(finalBal / Math.pow(1 + inflationRate, MAX_YEARS))} <span style="font-size:11px;font-weight:400;color:#6b7280">today's $</span></div></div>`
       : '';
     cards.innerHTML = `
-      <div class="card"><div class="card-label">Balance at yr 30</div><div class="card-value green">$${fmt0(finalBal)}</div></div>
+      <div class="card"><div class="card-label">Balance at yr ${MAX_YEARS}</div><div class="card-value green">$${fmt0(finalBal)}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
       <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
       ${realValCard}
@@ -574,7 +715,7 @@ function runMonteCarloAnalysis() {
 
   const pctColor = parseFloat(survivedPct) >= 80 ? 'green' : parseFloat(survivedPct) >= 50 ? 'blue' : 'red';
   document.getElementById('mc-cards').innerHTML = `
-    <div class="card"><div class="card-label">Survived 30 yrs</div><div class="card-value ${pctColor}">${survivedPct}%</div></div>
+    <div class="card"><div class="card-label">Survived ${MAX_YEARS} yrs</div><div class="card-value ${pctColor}">${survivedPct}%</div></div>
     <div class="card"><div class="card-label">Median final bal</div><div class="card-value purple">$${fmt0(medianFinal)}</div></div>
     ${worstDepletion !== null ? `<div class="card"><div class="card-label">Earliest depletion</div><div class="card-value red">Yr ${worstDepletion}</div></div>` : ''}
     ${survived.length > 0 ? `<div class="card"><div class="card-label">Best outcome</div><div class="card-value green">$${fmt0(bestFinal)}</div></div>` : ''}
@@ -718,7 +859,7 @@ function drawScatter(tab) {
                 return [
                   ` Final bal: $${fmt0(pt.x)}`,
                   ` Interest:  $${fmt0(pt.y)}`,
-                  run.depleted ? ` Depleted: Yr ${run.depletedYear}` : ' Survived 30 yrs'
+                  run.depleted ? ` Depleted: Yr ${run.depletedYear}` : ` Survived ${MAX_YEARS} yrs`
                 ];
               } else {
                 return [
