@@ -753,7 +753,6 @@ function fmtD(n)   { return '$' + Math.round(n).toLocaleString(); }
 function onInputChange() {
   if (mcAnalysisActive) resetAnalysis();
   calculate();
-  updateYearlyTableHeight();
 }
 
 function onInflationToggle() {
@@ -772,7 +771,6 @@ function reshuffle() {
   shuffledSequence = buildFullRandomSequence();
   resetAnalysis();
   calculate();
-  updateYearlyTableHeight();
 }
 
 function findSafeWithdrawal() {
@@ -872,36 +870,16 @@ function setHorizon(n) {
   );
   resetAnalysis();
   calculate();
-  updateYearlyTableHeight();
 }
 
 function updateResultsLayout() {
   const resultsStack = document.querySelector('.results-stack');
   if (!resultsStack) return;
   resultsStack.classList.add('table-fill');
-}
-
-function updateYearlyTableHeight() {
   const tablePanel = document.querySelector('[data-panel="yearly-table"]');
-  if (!tablePanel) return;
-  const scroll = tablePanel.querySelector('.scroll');
-  const title = tablePanel.querySelector('.table-title');
-  if (!scroll || !title) return;
-
-  if (window.innerWidth <= 1280) {
-    tablePanel.style.minHeight = '';
-    scroll.style.maxHeight = '';
-    return;
-  }
-
-  const panelRect = tablePanel.getBoundingClientRect();
-  const titleRect = title.getBoundingClientRect();
-  const viewportBottom = window.innerHeight - 24;
-  const available = Math.max(260, Math.floor(viewportBottom - panelRect.top));
-  const scrollHeight = Math.max(180, available - Math.ceil(titleRect.height) - 8);
-
-  tablePanel.style.minHeight = `${available}px`;
-  scroll.style.maxHeight = `${scrollHeight}px`;
+  const scroll = tablePanel ? tablePanel.querySelector('.scroll') : null;
+  if (tablePanel) tablePanel.style.minHeight = '';
+  if (scroll) scroll.style.maxHeight = '';
 }
 
 function setMode(m) {
@@ -915,7 +893,6 @@ function setMode(m) {
   resetAnalysis();
   if (m === 'rand' && shuffledSequence.length === 0) reshuffle();
   else calculate();
-  updateYearlyTableHeight();
 }
 
 // ─── Core simulation ─────────────────────────────────────────────────────────
@@ -1355,11 +1332,8 @@ function buildYearTable(rows, showSS, showBridge, inflationRate = 0, guardrailsO
   }).join('');
 }
 
-window.addEventListener('resize', updateYearlyTableHeight);
-
 updateResultsLayout();
 calculate();
-updateYearlyTableHeight();
 </script>
 </body>
 </html>
