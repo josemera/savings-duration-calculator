@@ -10,7 +10,7 @@ A single-file, client-side web app that models how long a portfolio will last un
 
 ## What it does
 
-You provide a starting capital, a monthly spending amount, and an optional Social Security income. The calculator simulates your portfolio balance year by year for up to 30 years and tells you either when it runs out or what it grows to.
+You provide a starting capital, a monthly spending amount, an optional bridge fund, and optional Social Security income. The calculator simulates your portfolio balance year by year for up to 30 years and tells you either when it runs out or what it grows to.
 
 Three return modes let you stress-test different scenarios:
 
@@ -103,6 +103,8 @@ An optional toggle in the controls panel. When enabled, a slider sets the annual
 
 **Social Security income** also grows at the inflation rate, starting from year 0 in today's dollars. This matches how SS Cost of Living Adjustments (COLA) work by law: the benefit accrues real value from the day you enter it, even during the delay period before payments begin. A $2,000/month SS benefit entered today will be worth ~$2,312/month when it starts five years from now.
 
+**Cash runway / bridge fund** is a separate up-front cash pool that grows at a fixed 3.0% annual rate and is spent before the portfolio is tapped. This lets you model a short-term bridge strategy without folding that cash into the invested starting capital.
+
 ### Why this doesn't double-count returns
 
 The 14 historical returns used by this calculator are **nominal** — inflation was already embedded in the market performance of those years. Applying a separate inflation rate to spending is therefore correct: you're modeling a portfolio that grows at historical nominal rates while expenses rise in nominal terms alongside them.
@@ -124,6 +126,7 @@ When inflation is active, two additional outputs appear:
 | Starting capital | Your initial portfolio value in dollars |
 | Monthly spend | Your spending in today's dollars (grown by inflation if enabled) |
 | Annual rate | Fixed return rate (Fixed rate mode only) |
+| Cash runway | Separate bridge fund available up front, spent before portfolio withdrawals and grown at 3.0% annually |
 | SS payment | Monthly Social Security income in today's dollars |
 | SS starts in | How many months until SS payments begin (slider, 0–120) |
 | Inflation adjustment | Optional toggle to enable inflation. Slider sets annual rate (default 3.0%) |
@@ -132,7 +135,7 @@ When inflation is active, two additional outputs appear:
 
 ## Output
 
-**Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, SS income received if applicable, and real value in today's dollars if inflation is enabled.
+**Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, bridge fund used if applicable, SS income received if applicable, and real value in today's dollars if inflation is enabled.
 
 **Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Random Sequence). In Random Sequence mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line. When inflation is enabled, hovering over any point shows both the nominal balance and its real value in today's dollars.
 
@@ -141,7 +144,8 @@ When inflation is active, two additional outputs appear:
 - Annual return applied
 - Interest earned
 - SS income received (inflation-adjusted when enabled)
-- Total withdrawals (inflation-adjusted when enabled)
+- Bridge fund used (when applicable)
+- Portfolio withdrawals (inflation-adjusted when enabled)
 - Net change
 - Ending balance
 - Real value in today's dollars (when inflation is enabled)
@@ -152,9 +156,9 @@ When inflation is active, two additional outputs appear:
 
 ## How returns are applied
 
-Each year's annual return is converted to a monthly compounding rate (`(1 + r)^(1/12) - 1`) and applied month by month. Withdrawals and SS income are processed each month against the current balance — so the timing of gains and losses within a year affects the result, rather than treating it as a year-end lump sum.
+Each year's annual return is converted to a monthly compounding rate (`(1 + r)^(1/12) - 1`) and applied month by month. Portfolio withdrawals, bridge-fund usage, and SS income are processed each month against the current balances — so the timing of gains and losses within a year affects the result, rather than treating it as a year-end lump sum.
 
-Social Security income offsets the portfolio withdrawal each month: only `max(0, monthly spend − SS payment)` is drawn from the portfolio once SS begins. If SS fully covers monthly expenses, the portfolio is not drawn down at all during those months.
+Social Security income offsets spending each month first. Any remaining spending need is then covered by the bridge fund before the portfolio is tapped. In other words, the portfolio only sees `max(0, monthly spend − SS payment − bridge available that month)` as a withdrawal. If SS and/or the bridge fund fully cover monthly expenses, the portfolio is not drawn down during those months.
 
 ---
 

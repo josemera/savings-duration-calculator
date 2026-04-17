@@ -237,6 +237,13 @@
         oninput="document.getElementById('ssVal').textContent=this.value+' mo';onInputChange()" />
       <span class="range-val" id="ssVal">0 mo</span>
     </div>
+    <div class="control-row">
+      <label>Cash runway ($)</label>
+      <input type="number" id="bridge-fund" value="0" oninput="onInputChange()" />
+    </div>
+    <p class="mode-note" style="margin-top:-2px;padding-bottom:2px;">
+      Separate bridge fund that grows at 3.0% annually and is spent before portfolio withdrawals begin.
+    </p>
 
     <hr class="divider">
 
@@ -313,6 +320,7 @@
             <th>Return</th>
             <th>Interest</th>
             <th id="th-ss" style="display:none;">SS income</th>
+            <th id="th-bridge" style="display:none;">Bridge used</th>
             <th>Withdrawals</th>
             <th>Net change</th>
             <th>Balance</th>
@@ -429,6 +437,7 @@ function findSafeWithdrawal() {
   const capital      = parseFloat(document.getElementById('capital').value)    || 0;
   const ssAmount     = parseFloat(document.getElementById('ss-amount').value)  || 0;
   const ssDelay      = parseInt(document.getElementById('ss-delay').value)     || 0;
+  const bridgeFund   = parseFloat(document.getElementById('bridge-fund').value) || 0;
   const inflationOn  = document.getElementById('inflation-toggle').checked;
   const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
   const guardrailsOn = document.getElementById('guardrails-toggle').checked;
@@ -446,7 +455,7 @@ function findSafeWithdrawal() {
       let survived = 0;
       for (let i = 0; i < RUNS; i++) {
         const seq = buildFullRandomSequence();
-        const r = simulateSequence(capital, spend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn);
+        const r = simulateSequence(capital, spend, ssAmount, ssDelay, bridgeFund, seq, null, inflationRate, guardrailsOn);
         if (!r.depleted) survived++;
       }
       return survived / RUNS;
@@ -459,7 +468,7 @@ function findSafeWithdrawal() {
     }
 
     // Binary search
-    let lo = 1, hi = Math.min(50000, Math.floor(capital / 12));
+    let lo = 1, hi = Math.min(50000, Math.floor((capital + bridgeFund) / 12));
     let bestSpend = 1;
     while (hi - lo > 50) {
       const mid = Math.floor((lo + hi) / 2);
@@ -476,7 +485,7 @@ function findSafeWithdrawal() {
     let verifiedSurvived = 0;
     for (let i = 0; i < RUNS; i++) {
       const seq = buildFullRandomSequence();
-      const r = simulateSequence(capital, bestSpend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn);
+      const r = simulateSequence(capital, bestSpend, ssAmount, ssDelay, bridgeFund, seq, null, inflationRate, guardrailsOn);
       if (!r.depleted) verifiedSurvived++;
     }
     displayFinderResult(bestSpend, verifiedSurvived, RUNS);
@@ -555,17 +564,19 @@ function buildSeqTable() {
 
 // ─── Core simulation ─────────────────────────────────────────────────────────
 
-function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate = 0, guardrailsOn = false) {
+function simulateSequence(capital, monthly, ssAmount, ssDelay, bridgeFund, seq, fixedRate, inflationRate = 0, guardrailsOn = false) {
   const balData = [capital];
   const yearRows = [];
   let balance = capital;
+  let bridgeBalance = bridgeFund;
   let depleted = false;
   let depletedYear = null;
   const IWR = guardrailsOn ? (monthly * 12) / capital : null;
   let guardrailSpend = guardrailsOn ? monthly : null;
+  const bridgeMonthlyRate = Math.pow(1 + 0.03, 1/12) - 1;
 
   for (let y = 0; y < MAX_YEARS; y++) {
-    if (balance <= 0) { depleted = true; depletedYear = y; break; }
+    if (balance <= 0 && bridgeBalance <= 0) { depleted = true; depletedYear = y; break; }
 
     let annualReturn, seqYr;
     if (mode === 'fixed') {
@@ -589,22 +600,28 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, i
     }
     const adjustedSpend = guardrailsOn ? guardrailSpend : monthly * inflFactor;
     const adjustedSS    = ssAmount * inflFactor;   // SS grows from today's dollars (COLA from yr 0)
-    let yearInterest = 0, yearSS = 0, yearWithdraw = 0;
+    let yearInterest = 0, yearSS = 0, yearWithdraw = 0, yearBridgeUsed = 0;
     const startBalance = balance;
 
     for (let m = 0; m < 12; m++) {
-      if (balance <= 0) break;
+      if (balance <= 0 && bridgeBalance <= 0) break;
       const globalMonth = y * 12 + m;
       const interest = balance * monthlyRate;
       const ss = (adjustedSS > 0 && globalMonth >= ssDelay) ? adjustedSS : 0;
+      const bridgeInterest = bridgeBalance * bridgeMonthlyRate;
+      const monthlyNeed = Math.max(0, adjustedSpend - ss);
+      const bridgeUsed = Math.min(bridgeBalance + bridgeInterest, monthlyNeed);
+      const portfolioWithdraw = monthlyNeed - bridgeUsed;
       yearInterest += interest;
       yearSS += ss;
-      yearWithdraw += Math.max(0, adjustedSpend - ss);
-      balance = Math.max(0, balance + interest - Math.max(0, adjustedSpend - ss));
+      yearBridgeUsed += bridgeUsed;
+      yearWithdraw += portfolioWithdraw;
+      bridgeBalance = Math.max(0, bridgeBalance + bridgeInterest - bridgeUsed);
+      balance = Math.max(0, balance + interest - portfolioWithdraw);
     }
 
     const netChange = balance - startBalance;
-    yearRows.push({ year: y+1, seqYr, annualReturn, yearInterest, yearSS, yearWithdraw, netChange, balance,
+    yearRows.push({ year: y+1, seqYr, annualReturn, yearInterest, yearSS, yearBridgeUsed, yearWithdraw, netChange, balance,
       monthlySpend: guardrailsOn ? guardrailSpend : null, guardrailEvent });
     balData.push(Math.round(balance));
   }
@@ -614,9 +631,10 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, i
 
   const totalInterest = yearRows.reduce((s, r) => s + r.yearInterest, 0);
   const totalSS       = yearRows.reduce((s, r) => s + r.yearSS, 0);
+  const totalBridgeUsed = yearRows.reduce((s, r) => s + r.yearBridgeUsed, 0);
   const finalBal      = balData[MAX_YEARS];
 
-  return { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal };
+  return { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, totalBridgeUsed, finalBal };
 }
 
 // ─── Single-run calculate ────────────────────────────────────────────────────
@@ -626,14 +644,15 @@ function calculate() {
   const monthly       = parseFloat(document.getElementById('monthly').value)   || 0;
   const ssAmount      = parseFloat(document.getElementById('ss-amount').value) || 0;
   const ssDelay       = parseInt(document.getElementById('ss-delay').value)    || 0;
+  const bridgeFund    = parseFloat(document.getElementById('bridge-fund').value) || 0;
   const fixedRate     = parseFloat(document.getElementById('rate').value) / 100;
   const inflationOn   = document.getElementById('inflation-toggle').checked;
   const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
   const guardrailsOn  = document.getElementById('guardrails-toggle').checked;
   if (capital <= 0 || monthly <= 0) return;
 
-  const { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal } =
-    simulateSequence(capital, monthly, ssAmount, ssDelay, shuffledSequence, fixedRate, inflationRate, guardrailsOn);
+  const { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, totalBridgeUsed, finalBal } =
+    simulateSequence(capital, monthly, ssAmount, ssDelay, bridgeFund, shuffledSequence, fixedRate, inflationRate, guardrailsOn);
 
   // Build labels
   const labels = ['Start'];
@@ -654,6 +673,7 @@ function calculate() {
     cards.innerHTML = `
       <div class="card"><div class="card-label">Depleted at</div><div class="card-value red">Yr ${depletedYear}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
+      ${bridgeFund > 0 ? `<div class="card"><div class="card-label">Bridge fund used</div><div class="card-value">$${fmt0(totalBridgeUsed)}</div></div>` : ''}
       ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
       ${guardrailCard}
     `;
@@ -665,6 +685,7 @@ function calculate() {
     cards.innerHTML = `
       <div class="card"><div class="card-label">Balance at yr ${MAX_YEARS}</div><div class="card-value green">$${fmt0(finalBal)}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(totalInterest)}</div></div>
+      ${bridgeFund > 0 ? `<div class="card"><div class="card-label">Bridge fund used</div><div class="card-value">$${fmt0(totalBridgeUsed)}</div></div>` : ''}
       <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
       ${realValCard}
       ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(totalSS)}</div></div>` : ''}
@@ -672,7 +693,7 @@ function calculate() {
     `;
   }
 
-  buildYearTable(yearRows, ssAmount > 0, inflationRate, guardrailsOn);
+  buildYearTable(yearRows, ssAmount > 0, bridgeFund > 0, inflationRate, guardrailsOn);
 
   if (mcAnalysisActive && mcRuns.length > 0) {
     drawFanChart();
@@ -688,6 +709,7 @@ function runMonteCarloAnalysis() {
   const monthly       = parseFloat(document.getElementById('monthly').value)   || 0;
   const ssAmount      = parseFloat(document.getElementById('ss-amount').value) || 0;
   const ssDelay       = parseInt(document.getElementById('ss-delay').value)    || 0;
+  const bridgeFund    = parseFloat(document.getElementById('bridge-fund').value) || 0;
   const fixedRate     = parseFloat(document.getElementById('rate').value) / 100;
   const inflationOn   = document.getElementById('inflation-toggle').checked;
   const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
@@ -697,7 +719,7 @@ function runMonteCarloAnalysis() {
   mcRuns = [];
   for (let i = 0; i < 500; i++) {
     const seq = buildFullRandomSequence();
-    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate, guardrailsOn);
+    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, bridgeFund, seq, fixedRate, inflationRate, guardrailsOn);
     mcRuns.push({ seq, ...result });
   }
 
@@ -937,9 +959,10 @@ function drawChart(labels, balData, inflationRate = 0) {
 
 // ─── Year table ──────────────────────────────────────────────────────────────
 
-function buildYearTable(rows, showSS, inflationRate = 0, guardrailsOn = false) {
+function buildYearTable(rows, showSS, showBridge, inflationRate = 0, guardrailsOn = false) {
   const showInflation = inflationRate > 0;
   document.getElementById('th-ss').style.display        = showSS ? '' : 'none';
+  document.getElementById('th-bridge').style.display    = showBridge ? '' : 'none';
   document.getElementById('th-seq').style.display       = (mode === 'seq' || mode === 'rand') ? '' : 'none';
   document.getElementById('th-real').style.display      = showInflation ? '' : 'none';
   document.getElementById('th-guardrail').style.display = guardrailsOn ? '' : 'none';
@@ -955,6 +978,7 @@ function buildYearTable(rows, showSS, inflationRate = 0, guardrailsOn = false) {
                       : '';
     const seqTd       = (mode === 'seq' || mode === 'rand') ? `<td>${r.seqYr}</td>` : '';
     const ssTd        = showSS ? `<td>${fmtD(r.yearSS)}</td>` : '';
+    const bridgeTd    = showBridge ? `<td>${fmtD(r.yearBridgeUsed)}</td>` : '';
     const realTd      = showInflation
       ? `<td class="muted">${fmtD(r.balance / Math.pow(1 + inflationRate, r.year))}</td>`
       : '';
@@ -965,6 +989,7 @@ function buildYearTable(rows, showSS, inflationRate = 0, guardrailsOn = false) {
       <td class="${retCls}">${fmtPct(r.annualReturn * 100)}</td>
       <td>${fmtD(r.yearInterest)}</td>
       ${ssTd}
+      ${bridgeTd}
       <td>${fmtD(r.yearWithdraw)}</td>
       <td class="${netCls}">${fmtD(r.netChange)}</td>
       <td>${fmtD(r.balance)}</td>
