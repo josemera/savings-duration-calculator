@@ -7,350 +7,607 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #030712; color: #fff; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; padding: 16px; }
-  .container { max-width: 900px; margin: 0 auto; }
+  :root {
+    --bg: #06111f;
+    --bg-alt: #0a1627;
+    --panel: rgba(11, 24, 40, 0.9);
+    --panel-strong: rgba(15, 31, 49, 0.96);
+    --panel-soft: rgba(10, 20, 33, 0.78);
+    --border: rgba(125, 158, 198, 0.18);
+    --border-strong: rgba(148, 184, 226, 0.24);
+    --text: #f8fafc;
+    --muted: #8ca0b8;
+    --muted-soft: #65758a;
+    --accent: #38bdf8;
+    --accent-strong: #0ea5e9;
+    --accent-soft: rgba(56, 189, 248, 0.14);
+    --success: #4ade80;
+    --danger: #f87171;
+    --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  }
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 28%),
+      radial-gradient(circle at 85% 18%, rgba(34, 197, 94, 0.08), transparent 22%),
+      linear-gradient(180deg, #04101c 0%, #06111f 44%, #020812 100%);
+    color: var(--text);
+    font-family: "Segoe UI", "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .container { max-width: 1440px; margin: 0 auto; }
+  .app-shell {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .sidebar {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-right: 4px;
+  }
+  .sidebar::-webkit-scrollbar { width: 10px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(148, 184, 226, 0.18);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .workspace { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .hero,
+  .panel,
+  .controls,
+  .chart-wrap,
+  .table-wrap,
+  .mc-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+  }
+  .hero {
+    overflow: hidden;
+    position: relative;
+    padding: 26px 28px;
+    background:
+      linear-gradient(135deg, rgba(8, 20, 35, 0.95), rgba(9, 25, 40, 0.88)),
+      linear-gradient(115deg, rgba(14, 165, 233, 0.18), transparent 45%);
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: auto -80px -120px auto;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    background: rgba(56, 189, 248, 0.08);
+    color: #bae6fd;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+  }
+  h1 { font-size: 30px; line-height: 1.05; font-weight: 700; margin-bottom: 10px; max-width: 14ch; }
+  .subtitle { color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 42ch; }
+  .hero-meta {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .meta-pill {
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    font-size: 12px;
+  }
 
-  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-  .subtitle { color: #6b7280; font-size: 13px; margin-bottom: 20px; }
+  .controls { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .panel-header { margin-bottom: 4px; }
+  .panel-title { font-size: 15px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+  .panel-subtitle { color: var(--muted-soft); font-size: 12px; line-height: 1.5; }
+  .control-section {
+    background: var(--panel-soft);
+    border: 1px solid rgba(148, 184, 226, 0.12);
+    border-radius: 18px;
+    padding: 16px;
+  }
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .section-title { font-size: 13px; font-weight: 700; color: #dbeafe; }
+  .section-note { color: var(--muted-soft); font-size: 11px; line-height: 1.45; }
 
-  /* Mode toggle */
-  .mode-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .mode-label { color: #9ca3af; font-size: 12px; white-space: nowrap; }
+  .mode-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .mode-row:last-child { margin-bottom: 0; }
+  .mode-label { color: #a9bdd4; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.08em; }
   .toggle-group { display: flex; }
   .toggle-btn {
-    padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
-    border: 1px solid #374151; background: #111827; color: #9ca3af;
+    padding: 9px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+    border: 1px solid rgba(148, 184, 226, 0.16); background: rgba(15, 31, 49, 0.78); color: #8ca0b8;
     transition: background 0.15s, color 0.15s;
   }
-  .toggle-btn:first-child { border-radius: 6px 0 0 6px; }
-  .toggle-btn:last-child { border-radius: 0 6px 6px 0; }
+  .toggle-btn:first-child { border-radius: 10px 0 0 10px; }
+  .toggle-btn:last-child { border-radius: 0 10px 10px 0; }
   .toggle-btn:not(:first-child) { border-left: none; }
-  .toggle-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .toggle-btn.active { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #eff6ff; border-color: #38bdf8; }
 
-  /* Controls panel */
-  .controls { background: #111827; border-radius: 12px; padding: 16px; margin-bottom: 20px; border: 1px solid #1f2937; }
   .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .control-row:last-child { margin-bottom: 0; }
-  .control-row label { color: #9ca3af; font-size: 12px; min-width: 160px; }
+  .control-row > * { min-width: 0; }
+  .control-row label {
+    color: #b7c8da;
+    font-size: 12px;
+    flex: 0 1 45%;
+    min-width: 0;
+    line-height: 1.35;
+  }
 
   input[type=number] {
-    background: #1f2937; color: #fff; border: 1px solid #374151;
-    border-radius: 6px; padding: 6px 10px; font-size: 13px; flex: 1;
+    background: rgba(15, 31, 49, 0.92); color: #fff; border: 1px solid rgba(148, 184, 226, 0.16);
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; flex: 1 1 auto; width: 100%; min-width: 0;
     outline: none;
   }
-  input[type=number]:focus { border-color: #2563eb; }
+  input[type=number]:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14); }
 
   input[type=range] {
-    -webkit-appearance: none; appearance: none; flex: 1; height: 6px;
-    background: #374151; border-radius: 3px; outline: none; cursor: pointer;
+    -webkit-appearance: none; appearance: none; flex: 1 1 auto; width: 100%; min-width: 0; height: 6px;
+    background: rgba(148, 184, 226, 0.16); border-radius: 999px; outline: none; cursor: pointer;
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 18px; height: 18px; background: #fff;
-    border-radius: 50%; border: 2px solid #374151; cursor: pointer;
+    border-radius: 50%; border: 3px solid #0ea5e9; cursor: pointer;
   }
-  .range-val { font-size: 13px; font-weight: 700; background: #1f2937; border-radius: 6px; padding: 4px 10px; min-width: 64px; text-align: center; color: #d1d5db; }
+  .range-val {
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(15, 31, 49, 0.96);
+    border-radius: 10px;
+    padding: 8px 10px;
+    min-width: 0;
+    width: 86px;
+    flex: 0 0 86px;
+    text-align: center;
+    color: #d1d5db;
+    border: 1px solid rgba(148, 184, 226, 0.14);
+  }
 
-  .divider { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
-  .mode-note { color: #4b5563; font-size: 12px; }
+  .divider { border: none; border-top: 1px solid rgba(148, 184, 226, 0.1); margin: 4px 0; }
+  .mode-note { color: var(--muted-soft); font-size: 12px; line-height: 1.55; }
 
   .reshuffle-btn {
-    padding: 6px 14px; background: #1f2937; color: #9ca3af; border: 1px solid #374151;
-    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    padding: 8px 12px; background: rgba(15, 31, 49, 0.92); color: #b7c8da; border: 1px solid rgba(148, 184, 226, 0.14);
+    border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
   }
-  .reshuffle-btn:hover { background: #374151; color: #d1d5db; }
+  .reshuffle-btn:hover { background: rgba(30, 41, 59, 1); color: #e2e8f0; }
 
   .run-analysis-btn {
-    padding: 6px 14px; background: #4c1d95; color: #c4b5fd; border: 1px solid #6d28d9;
-    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    padding: 8px 12px; background: rgba(10, 62, 88, 0.95); color: #bae6fd; border: 1px solid rgba(56, 189, 248, 0.34);
+    border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
   }
-  .run-analysis-btn:hover { background: #5b21b6; color: #ddd6fe; }
+  .run-analysis-btn:hover { background: rgba(8, 82, 118, 0.98); color: #e0f2fe; }
 
-  /* Stat cards */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
-  .card { background: #111827; border-radius: 10px; padding: 12px; border: 1px solid #1f2937; }
-  .card-label { color: #6b7280; font-size: 11px; margin-bottom: 4px; }
-  .card-value { font-weight: 700; font-size: 18px; }
+  .workspace-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 6px 4px 2px;
+  }
+  .workspace-title { font-size: 18px; font-weight: 700; color: #e2e8f0; }
+  .workspace-copy { color: var(--muted); font-size: 13px; max-width: 48ch; line-height: 1.5; }
+
+  .results-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .card { background: rgba(10, 20, 33, 0.84); border-radius: 16px; padding: 14px 16px; border: 1px solid rgba(148, 184, 226, 0.12); }
+  .card-label { color: var(--muted); font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .card-value { font-weight: 700; font-size: 21px; }
   .card-value.green  { color: #4ade80; }
   .card-value.red    { color: #f87171; }
-  .card-value.blue   { color: #60a5fa; }
-  .card-value.purple { color: #a78bfa; }
+  .card-value.blue   { color: #7dd3fc; }
+  .card-value.purple { color: #c084fc; }
 
-  /* Chart */
-  .chart-wrap { background: #111827; border-radius: 12px; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; }
-  .chart-wrap canvas { max-height: 260px; }
+  .chart-wrap { padding: 18px 18px 14px; }
+  .panel-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .panel-head .panel-title { margin-bottom: 2px; }
+  .chart-wrap canvas { max-height: 320px; }
 
-  /* Tables */
-  .table-wrap { background: #111827; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden; margin-bottom: 20px; }
-  .table-title { padding: 12px 16px; border-bottom: 1px solid #1f2937; font-size: 13px; color: #d1d5db; font-weight: 700; }
+  .table-wrap { overflow: hidden; }
+  .table-title { padding: 14px 18px; border-bottom: 1px solid rgba(148, 184, 226, 0.12); font-size: 13px; color: #e2e8f0; font-weight: 700; }
   .scroll { overflow-x: auto; max-height: 360px; overflow-y: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th {
-    padding: 8px 12px; color: #6b7280; font-size: 12px; font-weight: 600;
-    border-bottom: 1px solid #1f2937; text-align: right; white-space: nowrap;
-    position: sticky; top: 0; background: #111827; z-index: 1;
+    padding: 10px 12px; color: var(--muted); font-size: 11px; font-weight: 700;
+    border-bottom: 1px solid rgba(148, 184, 226, 0.12); text-align: right; white-space: nowrap;
+    position: sticky; top: 0; background: rgba(11, 24, 40, 0.98); z-index: 1; text-transform: uppercase; letter-spacing: 0.06em;
   }
   th:first-child { text-align: left; }
-  td { padding: 8px 12px; border-bottom: 1px solid #0f172a; text-align: right; white-space: nowrap; }
-  td:first-child { text-align: left; color: #9ca3af; }
-  tr:hover td { background: #1a2433; }
-  .green { color: #4ade80; } .red { color: #f87171; } .blue { color: #60a5fa; } .muted { color: #6b7280; }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(148, 184, 226, 0.08); text-align: right; white-space: nowrap; }
+  td:first-child { text-align: left; color: #b7c8da; }
+  tr:hover td { background: rgba(18, 34, 54, 0.84); }
+  .green { color: #4ade80; } .red { color: #f87171; } .blue { color: #7dd3fc; } .muted { color: var(--muted-soft); }
   tr.guardrail-boost td { background: rgba(52,211,153,0.08); }
   tr.guardrail-cut   td { background: rgba(248,113,113,0.08); }
 
-  /* Sequence ref table */
-  .seq-ref { margin-top: 20px; }
+  .seq-ref { margin-top: 0; }
 
-  /* MC Analysis section */
   .mc-section {
-    background: #0a0f1a; border: 1px solid #2d1f5e; border-radius: 12px;
-    overflow: hidden; margin-bottom: 20px;
+    background: linear-gradient(180deg, rgba(7, 18, 31, 0.96), rgba(10, 22, 39, 0.92));
+    border: 1px solid rgba(56, 189, 248, 0.14);
+    overflow: hidden;
   }
   .mc-section-header {
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
-    padding: 12px 16px; border-bottom: 1px solid #1e1541;
+    padding: 14px 18px; border-bottom: 1px solid rgba(56, 189, 248, 0.12);
   }
-  .mc-section-title { font-size: 13px; color: #c4b5fd; font-weight: 700; }
-  .mc-cards-wrap { padding: 16px 16px 0; }
-  .mc-scatter-wrap { padding: 16px; }
+  .mc-section-title { font-size: 13px; color: #bae6fd; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .mc-cards-wrap { padding: 18px 18px 0; }
+  .mc-scatter-wrap { padding: 18px; }
   .mc-viewing-note {
-    padding: 8px 16px; font-size: 11px; color: #6b7280;
-    border-top: 1px solid #1e1541; background: #060a12;
+    padding: 10px 18px; font-size: 11px; color: var(--muted);
+    border-top: 1px solid rgba(56, 189, 248, 0.12); background: rgba(5, 12, 23, 0.9);
   }
 
-  /* Safe withdrawal finder */
-  .finder-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid #1f2937; }
-  .finder-row { display: flex; align-items: center; gap: 10px; }
-  .finder-label { color: #9ca3af; font-size: 12px; white-space: nowrap; }
+  .finder-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(148, 184, 226, 0.1); }
+  .finder-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .finder-label { color: #b7c8da; font-size: 12px; white-space: nowrap; }
+  .analysis-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .analysis-actions .mode-note {
+    max-width: none;
+  }
+  .analysis-action-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
   .finder-select {
-    background: #1f2937; color: #d1d5db; border: 1px solid #374151;
-    border-radius: 6px; padding: 5px 10px; font-size: 13px; font-weight: 600; cursor: pointer; outline: none;
+    background: rgba(15, 31, 49, 0.92); color: #d1d5db; border: 1px solid rgba(148, 184, 226, 0.16);
+    border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; cursor: pointer; outline: none;
   }
   .finder-btn {
-    padding: 6px 14px; background: #1c3a2a; color: #4ade80; border: 1px solid #15803d;
-    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    padding: 8px 12px; background: rgba(15, 55, 37, 0.92); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.4);
+    border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
   }
-  .finder-btn:hover { background: #14532d; color: #86efac; }
+  .finder-btn:hover { background: rgba(18, 82, 47, 0.96); color: #dcfce7; }
   .finder-result { margin-top: 12px; }
   .finder-card {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    background: #0d1f15; border: 1px solid #15803d; border-radius: 10px; padding: 12px 16px;
+    background: rgba(8, 34, 24, 0.92); border: 1px solid rgba(34, 197, 94, 0.28); border-radius: 16px; padding: 14px 16px;
   }
   .finder-card > div { min-width: 130px; }
   .apply-btn {
-    padding: 6px 14px; background: #14532d; color: #4ade80; border: 1px solid #15803d;
-    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; margin-left: auto;
+    padding: 8px 12px; background: rgba(18, 82, 47, 0.96); color: #bbf7d0; border: 1px solid rgba(34, 197, 94, 0.4);
+    border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; margin-left: auto;
   }
-  .apply-btn:hover { background: #166534; color: #86efac; }
+  .apply-btn:hover { background: rgba(21, 128, 61, 0.98); color: #f0fdf4; }
 
-  @media (max-width: 600px) {
+  .results-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  @media (max-width: 1100px) {
+    body { padding: 18px; }
+    .app-shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; max-height: none; overflow: visible; padding-right: 0; }
+    h1 { max-width: none; }
+  }
+
+  @media (max-width: 720px) {
+    body { padding: 14px; }
+    .hero, .controls, .chart-wrap, .table-wrap, .mc-section { border-radius: 18px; }
+    .workspace-header { padding-left: 0; }
     .control-row { flex-wrap: wrap; }
     .control-row label { min-width: 100%; }
+    .toggle-group { width: 100%; flex-wrap: wrap; }
+    .toggle-btn {
+      flex: 1 1 auto;
+      border-left: 1px solid rgba(148, 184, 226, 0.16) !important;
+      border-radius: 10px;
+      margin-bottom: 6px;
+    }
+    .cards { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 520px) {
+    .cards { grid-template-columns: 1fr; }
+    .control-row { flex-wrap: wrap; }
+    .finder-card { align-items: flex-start; }
+    .apply-btn { margin-left: 0; }
+    .analysis-action-row > button {
+      width: 100%;
+    }
   }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Savings Duration Calculator</h1>
-  <p class="subtitle">How long will your savings last? Model with a fixed rate, historical sequence, or random sequence simulation.</p>
-
-  <!-- Mode toggle -->
-  <div class="mode-row">
-    <span class="mode-label" style="min-width:90px;">Return mode</span>
-    <div class="toggle-group">
-      <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
-      <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical sequence</button>
-      <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Random Sequence</button>
-    </div>
-  </div>
-  <div class="mode-row">
-    <span class="mode-label" style="min-width:90px;">Horizon</span>
-    <div class="toggle-group">
-      <button class="toggle-btn" id="btn-h10" onclick="setHorizon(10)">10 yr</button>
-      <button class="toggle-btn" id="btn-h15" onclick="setHorizon(15)">15 yr</button>
-      <button class="toggle-btn" id="btn-h20" onclick="setHorizon(20)">20 yr</button>
-      <button class="toggle-btn" id="btn-h25" onclick="setHorizon(25)">25 yr</button>
-      <button class="toggle-btn active" id="btn-h30" onclick="setHorizon(30)">30 yr</button>
-      <button class="toggle-btn" id="btn-h40" onclick="setHorizon(40)">40 yr</button>
-    </div>
-  </div>
-
-  <!-- Controls -->
-  <div class="controls">
-    <div class="control-row">
-      <label>Starting capital ($)</label>
-      <input type="number" id="capital" value="500000" oninput="onInputChange()" />
-    </div>
-    <div class="control-row">
-      <label>Monthly spend ($)</label>
-      <input type="number" id="monthly" value="4000" oninput="onInputChange()" />
-    </div>
-
-    <!-- Fixed rate panel -->
-    <div id="fixed-panel">
-      <div class="control-row">
-        <label>Annual rate (%)</label>
-        <input type="range" min="0" max="15" step="0.1" value="6" id="rate"
-          oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
-        <span class="range-val" id="rateVal">6.0%</span>
-      </div>
-    </div>
-
-    <!-- Seq panel -->
-    <div id="seq-panel" style="display:none;">
-      <p class="mode-note">Uses 14 historical annual returns in order, cycling after year 14.</p>
-    </div>
-
-    <!-- Random Sequence panel -->
-    <div id="rand-panel" style="display:none;">
-      <div class="control-row" style="margin-bottom:0;">
-        <p class="mode-note" style="flex:1;">Bootstrapped historical returns — 14 real returns drawn in random order, refilling each cycle.</p>
-        <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
-        <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
-      </div>
-      <div class="finder-section">
-        <div class="finder-row">
-          <span class="finder-label">What can I safely spend?</span>
-          <select id="finder-target" class="finder-select">
-            <option value="99">99% survival</option>
-            <option value="95">95% survival</option>
-            <option value="90" selected>90% survival</option>
-            <option value="85">85% survival</option>
-            <option value="80">80% survival</option>
-            <option value="75">75% survival</option>
-          </select>
-          <button class="finder-btn" onclick="findSafeWithdrawal()">Find ▶</button>
+  <div class="app-shell" data-layout="workspace-shell">
+    <aside class="sidebar" data-region="controls">
+      <section class="hero" data-panel="hero">
+        <div class="eyebrow">Retirement Bridge Planner</div>
+        <h1>Savings Duration Calculator</h1>
+        <p class="subtitle">Model how long your savings last with fixed returns, historical sequencing, or randomized stress testing.</p>
+        <div class="hero-meta">
+          <span class="meta-pill">Bridge fund aware</span>
+          <span class="meta-pill">Sequence-of-returns testing</span>
+          <span class="meta-pill">Portable to Preact sections</span>
         </div>
-        <div id="finder-result" style="display:none;"></div>
+      </section>
+
+      <section class="controls" data-panel="controls">
+        <div class="panel-header">
+          <div class="panel-title">Scenario Builder</div>
+          <div class="panel-subtitle">Grouped controls keep the UI modular now and map cleanly to future sidebar components in Electron + Preact.</div>
+        </div>
+
+        <section class="control-section" data-section="scenario">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Scenario</div>
+              <div class="section-note">Choose the return model and planning horizon.</div>
+            </div>
+          </div>
+          <div class="mode-row">
+            <span class="mode-label">Return mode</span>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
+              <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical sequence</button>
+              <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Random Sequence</button>
+            </div>
+          </div>
+          <div class="mode-row">
+            <span class="mode-label">Horizon</span>
+            <div class="toggle-group">
+              <button class="toggle-btn" id="btn-h10" onclick="setHorizon(10)">10 yr</button>
+              <button class="toggle-btn" id="btn-h15" onclick="setHorizon(15)">15 yr</button>
+              <button class="toggle-btn" id="btn-h20" onclick="setHorizon(20)">20 yr</button>
+              <button class="toggle-btn" id="btn-h25" onclick="setHorizon(25)">25 yr</button>
+              <button class="toggle-btn active" id="btn-h30" onclick="setHorizon(30)">30 yr</button>
+              <button class="toggle-btn" id="btn-h40" onclick="setHorizon(40)">40 yr</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-section" data-section="spending">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Core Inputs</div>
+              <div class="section-note">These are the primary assumptions that drive every result panel on the right.</div>
+            </div>
+          </div>
+          <div class="control-row">
+            <label>Starting capital ($)</label>
+            <input type="number" id="capital" value="500000" oninput="onInputChange()" />
+          </div>
+          <div class="control-row">
+            <label>Monthly spend ($)</label>
+            <input type="number" id="monthly" value="4000" oninput="onInputChange()" />
+          </div>
+          <div id="fixed-panel">
+            <div class="control-row">
+              <label>Annual rate (%)</label>
+              <input type="range" min="0" max="15" step="0.1" value="6" id="rate"
+                oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
+              <span class="range-val" id="rateVal">6.0%</span>
+            </div>
+          </div>
+          <div id="seq-panel" style="display:none;">
+            <p class="mode-note">Uses 14 historical annual returns in order, cycling after year 14.</p>
+          </div>
+        </section>
+
+        <section class="control-section" data-section="income">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Income & Bridge</div>
+              <div class="section-note">Offset spending with Social Security and spend down runway cash before the portfolio is tapped.</div>
+            </div>
+          </div>
+          <div class="control-row">
+            <label>SS payment ($/mo)</label>
+            <input type="number" id="ss-amount" value="0" oninput="onInputChange()" />
+          </div>
+          <div class="control-row">
+            <label>SS starts in (months)</label>
+            <input type="range" min="0" max="120" step="1" value="0" id="ss-delay"
+              oninput="document.getElementById('ssVal').textContent=this.value+' mo';onInputChange()" />
+            <span class="range-val" id="ssVal">0 mo</span>
+          </div>
+          <div class="control-row">
+            <label>Cash runway ($)</label>
+            <input type="number" id="bridge-fund" value="0" oninput="onInputChange()" />
+          </div>
+          <p class="mode-note">Separate bridge fund that grows at 3.0% annually and is spent before portfolio withdrawals begin.</p>
+        </section>
+
+        <section class="control-section" data-section="adjustments">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Adjustments</div>
+              <div class="section-note">Use optional modifiers to model purchasing power drift and guardrail-based spending changes.</div>
+            </div>
+          </div>
+          <div class="control-row" style="margin-bottom:0;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-width:100%;">
+              <input type="checkbox" id="inflation-toggle" onchange="onInflationToggle()"
+                style="width:15px;height:15px;cursor:pointer;accent-color:#38bdf8;" />
+              Inflation adjustment
+            </label>
+          </div>
+          <div id="inflation-panel" style="display:none;margin-top:14px;">
+            <div class="control-row">
+              <label>Annual inflation rate (%)</label>
+              <input type="range" min="0" max="10" step="0.1" value="3.0" id="inflation-rate"
+                oninput="document.getElementById('inflationVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
+              <span class="range-val" id="inflationVal">3.0%</span>
+            </div>
+            <p class="mode-note">Spending and SS grow at this rate annually. Returns are nominal, so there’s no double-counting.</p>
+          </div>
+          <hr class="divider">
+          <div class="control-row" style="margin-bottom:0;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-width:100%;">
+              <input type="checkbox" id="guardrails-toggle" onchange="onGuardrailsToggle()"
+                style="width:15px;height:15px;cursor:pointer;accent-color:#38bdf8;" />
+              Spending guardrails
+            </label>
+          </div>
+          <div id="guardrails-panel" style="display:none;margin-top:14px;">
+            <p class="mode-note">Guyton-Klinger: cut 10% if withdrawal rate rises above 120% of initial; boost 10% if it drops below 80%.</p>
+          </div>
+        </section>
+
+        <section class="control-section" id="rand-panel" style="display:none;" data-section="analysis">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Random Analysis</div>
+              <div class="section-note">Bootstrapped historical returns drawn in random order, refilling each cycle.</div>
+            </div>
+          </div>
+          <div class="analysis-actions" style="margin-bottom:0;">
+            <p class="mode-note">Run a 500-path distribution analysis or search for the highest monthly spend that still meets your survival target.</p>
+            <div class="analysis-action-row">
+              <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
+              <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
+            </div>
+          </div>
+          <div class="finder-section">
+            <div class="finder-row">
+              <span class="finder-label">What can I safely spend?</span>
+              <select id="finder-target" class="finder-select">
+                <option value="99">99% survival</option>
+                <option value="95">95% survival</option>
+                <option value="90" selected>90% survival</option>
+                <option value="85">85% survival</option>
+                <option value="80">80% survival</option>
+                <option value="75">75% survival</option>
+              </select>
+              <button class="finder-btn" onclick="findSafeWithdrawal()">Find ▶</button>
+            </div>
+            <div id="finder-result" style="display:none;"></div>
+          </div>
+        </section>
+      </section>
+    </aside>
+
+    <main class="workspace" data-region="results">
+      <div class="workspace-header">
+        <div>
+          <div class="workspace-title">Results Workspace</div>
+          <div class="workspace-copy">Cards provide the headline outcome, the chart acts as the main visual, and the tables below are the drill-down layers.</div>
+        </div>
       </div>
-    </div>
 
-    <hr class="divider">
+      <div class="results-stack">
+        <div class="cards" id="cards"></div>
 
-    <!-- Social Security -->
-    <div class="control-row">
-      <label>SS payment ($/mo)</label>
-      <input type="number" id="ss-amount" value="0" oninput="onInputChange()" />
-    </div>
-    <div class="control-row">
-      <label>SS starts in (months)</label>
-      <input type="range" min="0" max="120" step="1" value="0" id="ss-delay"
-        oninput="document.getElementById('ssVal').textContent=this.value+' mo';onInputChange()" />
-      <span class="range-val" id="ssVal">0 mo</span>
-    </div>
-    <div class="control-row">
-      <label>Cash runway ($)</label>
-      <input type="number" id="bridge-fund" value="0" oninput="onInputChange()" />
-    </div>
-    <p class="mode-note" style="margin-top:-2px;padding-bottom:2px;">
-      Separate bridge fund that grows at 3.0% annually and is spent before portfolio withdrawals begin.
-    </p>
+        <section class="chart-wrap" data-panel="chart">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Balance Trajectory</div>
+              <div class="panel-subtitle">The main visual stays centered in the right workspace, making it the natural focal point.</div>
+            </div>
+          </div>
+          <canvas id="chart"></canvas>
+        </section>
 
-    <hr class="divider">
+        <div class="mc-section" id="mc-analysis" style="display:none;">
+          <div class="mc-section-header">
+            <span class="mc-section-title">500-Run Distribution</span>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="scatter-tab-outcome"  onclick="switchScatterTab('outcome')">Outcome</button>
+              <button class="toggle-btn"        id="scatter-tab-timeline" onclick="switchScatterTab('timeline')">Timeline</button>
+            </div>
+          </div>
+          <div class="mc-cards-wrap">
+            <div class="cards" id="mc-cards" style="margin-bottom:0;"></div>
+          </div>
+          <div class="mc-scatter-wrap">
+            <canvas id="scatterChart" height="220" style="cursor:crosshair;"></canvas>
+          </div>
+          <div class="mc-viewing-note" id="mc-viewing-note" style="display:none;"></div>
+        </div>
 
-    <!-- Inflation -->
-    <div class="control-row" style="margin-bottom:0;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="inflation-toggle" onchange="onInflationToggle()"
-          style="width:15px;height:15px;cursor:pointer;accent-color:#a78bfa;" />
-        Inflation adjustment
-      </label>
-    </div>
-    <div id="inflation-panel" style="display:none;">
-      <div class="control-row" style="margin-top:14px;">
-        <label>Annual inflation rate (%)</label>
-        <input type="range" min="0" max="10" step="0.1" value="3.0" id="inflation-rate"
-          oninput="document.getElementById('inflationVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
-        <span class="range-val" id="inflationVal">3.0%</span>
+        <section class="table-wrap" data-panel="yearly-table">
+          <div class="table-title" id="yr-table-title">Yearly breakdown</div>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Year</th>
+                  <th id="th-seq">Seq yr</th>
+                  <th>Return</th>
+                  <th>Interest</th>
+                  <th id="th-ss" style="display:none;">SS income</th>
+                  <th id="th-bridge" style="display:none;">Bridge used</th>
+                  <th>Withdrawals</th>
+                  <th>Net change</th>
+                  <th>Balance</th>
+                  <th id="th-real" style="display:none;">Real value</th>
+                  <th id="th-guardrail" style="display:none;">Spend/mo</th>
+                </tr>
+              </thead>
+              <tbody id="yr-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="table-wrap seq-ref" id="seq-ref" style="display:none;" data-panel="sequence-reference">
+          <div class="table-title">14-year sequence reference</div>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Seq yr</th>
+                  <th>Annual return</th>
+                  <th>From cumulative</th>
+                  <th>To cumulative</th>
+                </tr>
+              </thead>
+              <tbody id="seq-tbody"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
-      <p class="mode-note" style="margin-bottom:0;padding-bottom:2px;">
-        Spending and SS grow at this rate annually. Returns are nominal — no double-counting.
-      </p>
-    </div>
-
-    <!-- Guardrails -->
-    <div class="control-row" style="margin-bottom:0;margin-top:14px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="guardrails-toggle" onchange="onGuardrailsToggle()"
-          style="width:15px;height:15px;cursor:pointer;accent-color:#a78bfa;" />
-        Spending guardrails
-      </label>
-    </div>
-    <div id="guardrails-panel" style="display:none;">
-      <p class="mode-note" style="margin-bottom:0;padding-bottom:2px;margin-top:10px;">
-        Guyton-Klinger: cut 10% if withdrawal rate rises above 120% of initial; boost 10% if it drops below 80%.
-      </p>
-    </div>
+    </main>
   </div>
-
-  <!-- Stat cards (single run) -->
-  <div class="cards" id="cards"></div>
-
-  <!-- Chart -->
-  <div class="chart-wrap">
-    <canvas id="chart"></canvas>
-  </div>
-
-  <!-- MC Analysis section -->
-  <div class="mc-section" id="mc-analysis" style="display:none;">
-    <div class="mc-section-header">
-      <span class="mc-section-title">&#127912; 500-Run Distribution</span>
-      <div class="toggle-group">
-        <button class="toggle-btn active" id="scatter-tab-outcome"  onclick="switchScatterTab('outcome')">Outcome</button>
-        <button class="toggle-btn"        id="scatter-tab-timeline" onclick="switchScatterTab('timeline')">Timeline</button>
-      </div>
-    </div>
-    <div class="mc-cards-wrap">
-      <div class="cards" id="mc-cards" style="margin-bottom:0;"></div>
-    </div>
-    <div class="mc-scatter-wrap">
-      <canvas id="scatterChart" height="220" style="cursor:crosshair;"></canvas>
-    </div>
-    <div class="mc-viewing-note" id="mc-viewing-note" style="display:none;"></div>
-  </div>
-
-  <!-- Yearly table -->
-  <div class="table-wrap">
-    <div class="table-title" id="yr-table-title">Yearly breakdown</div>
-    <div class="scroll">
-      <table>
-        <thead>
-          <tr>
-            <th style="text-align:left;">Year</th>
-            <th id="th-seq">Seq yr</th>
-            <th>Return</th>
-            <th>Interest</th>
-            <th id="th-ss" style="display:none;">SS income</th>
-            <th id="th-bridge" style="display:none;">Bridge used</th>
-            <th>Withdrawals</th>
-            <th>Net change</th>
-            <th>Balance</th>
-            <th id="th-real" style="display:none;">Real value</th>
-            <th id="th-guardrail" style="display:none;">Spend/mo</th>
-          </tr>
-        </thead>
-        <tbody id="yr-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Sequence reference -->
-  <div class="table-wrap seq-ref" id="seq-ref" style="display:none;">
-    <div class="table-title">14-year sequence reference</div>
-    <div class="scroll">
-      <table>
-        <thead>
-          <tr>
-            <th style="text-align:left;">Seq yr</th>
-            <th>Annual return</th>
-            <th>From cumulative</th>
-            <th>To cumulative</th>
-          </tr>
-        </thead>
-        <tbody id="seq-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
 </div>
 
 <script>
