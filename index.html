@@ -77,7 +77,7 @@
   .hero {
     overflow: hidden;
     position: relative;
-    padding: 26px 28px;
+    padding: 30px 28px 30px;
     background:
       linear-gradient(135deg, rgba(8, 20, 35, 0.95), rgba(9, 25, 40, 0.88)),
       linear-gradient(115deg, rgba(14, 165, 233, 0.18), transparent 45%);
@@ -93,37 +93,75 @@
     pointer-events: none;
   }
   .eyebrow {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(56, 189, 248, 0.22);
-    background: rgba(56, 189, 248, 0.08);
-    color: #bae6fd;
-    font-size: 11px;
+    justify-content: center;
+    width: max-content;
+    max-width: 100%;
+    margin: 0 auto 16px;
+    padding: 0 4px;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    color: #bfe8ff;
+    font-size: 14px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 14px;
+    letter-spacing: 0.12em;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    opacity: 0.92;
   }
-  h1 { font-size: 30px; line-height: 1.05; font-weight: 700; margin-bottom: 10px; max-width: 14ch; }
-  .subtitle { color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 42ch; }
-  .hero-meta {
-    margin-top: 18px;
+  h1 { font-size: 22px; line-height: 1.1; font-weight: 700; margin-bottom: 0; max-width: none; }
+  .hero-help {
+    position: absolute;
+    top: 22px;
+    right: 22px;
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .meta-pill {
-    padding: 8px 12px;
-    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(148, 184, 226, 0.18);
     background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #bfe8ff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: help;
+    flex: 0 0 auto;
+  }
+  .hero-help:focus-visible {
+    outline: 2px solid rgba(56, 189, 248, 0.45);
+    outline-offset: 2px;
+  }
+  .hero-tooltip {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(280px, calc(100vw - 72px));
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 184, 226, 0.18);
+    background: rgba(9, 19, 33, 0.96);
     color: var(--muted);
     font-size: 12px;
+    line-height: 1.55;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 5;
   }
-
+  .hero-help:hover .hero-tooltip,
+  .hero-help:focus .hero-tooltip,
+  .hero-help:focus-within .hero-tooltip {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
   .controls { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
   .panel-header { margin-bottom: 4px; }
   .panel-title { font-size: 15px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
@@ -354,6 +392,13 @@
     .analysis-action-row > button {
       width: 100%;
     }
+    .hero-help {
+      top: 18px;
+      right: 18px;
+      width: 24px;
+      height: 24px;
+      font-size: 13px;
+    }
   }
 </style>
 </head>
@@ -363,13 +408,11 @@
     <aside class="sidebar" data-region="controls">
       <section class="hero" data-panel="hero">
         <div class="eyebrow">Retirement Bridge Planner</div>
+        <button class="hero-help" type="button" aria-label="About this calculator">
+          ?
+          <span class="hero-tooltip">Model how long your savings last with fixed returns, historical sequencing, or randomized stress testing.</span>
+        </button>
         <h1>Savings Duration Calculator</h1>
-        <p class="subtitle">Model how long your savings last with fixed returns, historical sequencing, or randomized stress testing.</p>
-        <div class="hero-meta">
-          <span class="meta-pill">Bridge fund aware</span>
-          <span class="meta-pill">Sequence-of-returns testing</span>
-          <span class="meta-pill">Portable to Preact sections</span>
-        </div>
       </section>
 
       <section class="controls" data-panel="controls">
