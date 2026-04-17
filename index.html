@@ -7,9 +7,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { overflow-x: hidden; }
   :root {
     --bg: #06111f;
     --bg-alt: #0a1627;
+    --top-rail-height: 124px;
     --panel: rgba(11, 24, 40, 0.9);
     --panel-strong: rgba(15, 31, 49, 0.96);
     --panel-soft: rgba(10, 20, 33, 0.78);
@@ -34,24 +36,32 @@
     font-family: "Segoe UI", "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
     padding: 24px;
+    overflow-x: hidden;
   }
-  .container { max-width: 1440px; margin: 0 auto; }
+  .container { max-width: 1440px; margin: 0 auto; overflow-x: clip; }
   .app-shell {
     display: grid;
-    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
     gap: 24px;
     align-items: start;
+    max-height: calc(100vh - 48px);
   }
   .sidebar {
     position: sticky;
-    top: 24px;
+    top: 0;
     align-self: start;
+    width: 100%;
     max-height: calc(100vh - 48px);
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 18px;
     padding-right: 4px;
+  }
+  .sidebar > * {
+    position: relative;
+    z-index: 0;
   }
   .sidebar::-webkit-scrollbar { width: 10px; }
   .sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -61,7 +71,15 @@
     border: 2px solid transparent;
     background-clip: padding-box;
   }
-  .workspace { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+    max-height: calc(100vh - 48px);
+    min-height: 0;
+    overflow: hidden;
+  }
   .hero,
   .panel,
   .controls,
@@ -75,9 +93,14 @@
     backdrop-filter: blur(18px);
   }
   .hero {
-    overflow: hidden;
+    overflow: visible;
     position: relative;
-    padding: 30px 28px 30px;
+    z-index: 8;
+    padding: 20px 24px 18px;
+    height: var(--top-rail-height);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     background:
       linear-gradient(135deg, rgba(8, 20, 35, 0.95), rgba(9, 25, 40, 0.88)),
       linear-gradient(115deg, rgba(14, 165, 233, 0.18), transparent 45%);
@@ -92,42 +115,43 @@
     background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, transparent 70%);
     pointer-events: none;
   }
-  .eyebrow {
+  .hero-topline {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: max-content;
-    max-width: 100%;
-    margin: 0 auto 16px;
-    padding: 0 4px;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0;
     border-radius: 0;
     border: none;
     background: transparent;
     color: #bfe8ff;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     line-height: 1.1;
-    text-align: center;
+    text-align: left;
     white-space: nowrap;
     opacity: 0.92;
   }
-  h1 { font-size: 22px; line-height: 1.1; font-weight: 700; margin-bottom: 0; max-width: none; }
+  h1 { font-size: 17px; line-height: 1.15; font-weight: 700; margin-bottom: 0; max-width: none; text-align: left; }
   .hero-help {
-    position: absolute;
-    top: 22px;
-    right: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     border: 1px solid rgba(148, 184, 226, 0.18);
     background: rgba(255, 255, 255, 0.04);
     color: #bfe8ff;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
     cursor: help;
     flex: 0 0 auto;
@@ -135,32 +159,6 @@
   .hero-help:focus-visible {
     outline: 2px solid rgba(56, 189, 248, 0.45);
     outline-offset: 2px;
-  }
-  .hero-tooltip {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    width: min(280px, calc(100vw - 72px));
-    padding: 12px 14px;
-    border-radius: 14px;
-    border: 1px solid rgba(148, 184, 226, 0.18);
-    background: rgba(9, 19, 33, 0.96);
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.55;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-4px);
-    transition: opacity 0.15s ease, transform 0.15s ease;
-    z-index: 5;
-  }
-  .hero-help:hover .hero-tooltip,
-  .hero-help:focus .hero-tooltip,
-  .hero-help:focus-within .hero-tooltip {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
   }
   .controls { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
   .panel-header { margin-bottom: 4px; }
@@ -177,10 +175,45 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
   }
-  .section-title { font-size: 13px; font-weight: 700; color: #dbeafe; }
-  .section-note { color: var(--muted-soft); font-size: 11px; line-height: 1.45; }
+  .section-header > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #dbeafe;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+  .section-note {
+    color: var(--muted-soft);
+    font-size: 12px;
+    line-height: 1.5;
+    max-width: 32ch;
+  }
+  .section-help {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border-radius: 50%;
+    border: 1px solid rgba(148, 184, 226, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+    color: #bfe8ff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: help;
+  }
+  .section-help:focus-visible {
+    outline: 2px solid rgba(56, 189, 248, 0.45);
+    outline-offset: 2px;
+  }
 
   .mode-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
   .mode-row:last-child { margin-bottom: 0; }
@@ -251,19 +284,18 @@
   }
   .run-analysis-btn:hover { background: rgba(8, 82, 118, 0.98); color: #e0f2fe; }
 
-  .workspace-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 6px 4px 2px;
-  }
-  .workspace-title { font-size: 18px; font-weight: 700; color: #e2e8f0; }
-  .workspace-copy { color: var(--muted); font-size: 13px; max-width: 48ch; line-height: 1.5; }
-
   .results-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-  .card { background: rgba(10, 20, 33, 0.84); border-radius: 16px; padding: 14px 16px; border: 1px solid rgba(148, 184, 226, 0.12); }
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .card {
+    background: rgba(10, 20, 33, 0.84);
+    border-radius: 16px;
+    padding: 14px 16px;
+    border: 1px solid rgba(148, 184, 226, 0.12);
+    height: var(--top-rail-height);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
   .card-label { color: var(--muted); font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
   .card-value { font-weight: 700; font-size: 21px; }
   .card-value.green  { color: #4ade80; }
@@ -298,8 +330,6 @@
   .green { color: #4ade80; } .red { color: #f87171; } .blue { color: #7dd3fc; } .muted { color: var(--muted-soft); }
   tr.guardrail-boost td { background: rgba(52,211,153,0.08); }
   tr.guardrail-cut   td { background: rgba(248,113,113,0.08); }
-
-  .seq-ref { margin-top: 0; }
 
   .mc-section {
     background: linear-gradient(180deg, rgba(7, 18, 31, 0.96), rgba(10, 22, 39, 0.92));
@@ -360,18 +390,41 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
+  .results-stack.table-fill {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .results-stack.table-fill .table-wrap[data-panel="yearly-table"] {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .results-stack.table-fill .table-wrap[data-panel="yearly-table"] .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+  }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1280px) {
     body { padding: 18px; }
-    .app-shell { grid-template-columns: 1fr; }
+    .app-shell { grid-template-columns: 1fr; max-height: none; }
     .sidebar { position: static; max-height: none; overflow: visible; padding-right: 0; }
+    .workspace { max-height: none; overflow: visible; }
     h1 { max-width: none; }
   }
 
   @media (max-width: 720px) {
     body { padding: 14px; }
     .hero, .controls, .chart-wrap, .table-wrap, .mc-section { border-radius: 18px; }
-    .workspace-header { padding-left: 0; }
+    .hero,
+    .card {
+      height: auto;
+      min-height: var(--top-rail-height);
+    }
     .control-row { flex-wrap: wrap; }
     .control-row label { min-width: 100%; }
     .toggle-group { width: 100%; flex-wrap: wrap; }
@@ -392,9 +445,15 @@
     .analysis-action-row > button {
       width: 100%;
     }
+    .hero-topline {
+      margin-bottom: 14px;
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      white-space: normal;
+    }
     .hero-help {
-      top: 18px;
-      right: 18px;
       width: 24px;
       height: 24px;
       font-size: 13px;
@@ -407,11 +466,10 @@
   <div class="app-shell" data-layout="workspace-shell">
     <aside class="sidebar" data-region="controls">
       <section class="hero" data-panel="hero">
-        <div class="eyebrow">Retirement Bridge Planner</div>
-        <button class="hero-help" type="button" aria-label="About this calculator">
-          ?
-          <span class="hero-tooltip">Model how long your savings last with fixed returns, historical sequencing, or randomized stress testing.</span>
-        </button>
+        <div class="hero-topline">
+          <div class="eyebrow">Retirement Bridge Planner</div>
+          <button class="hero-help" type="button" aria-label="About this calculator" title="Model how long your savings last with fixed returns, historical sequencing, or randomized stress testing.">?</button>
+        </div>
         <h1>Savings Duration Calculator</h1>
       </section>
 
@@ -427,6 +485,7 @@
               <div class="section-title">Scenario</div>
               <div class="section-note">Choose the return model and planning horizon.</div>
             </div>
+            <button class="section-help" type="button" aria-label="Scenario help" title="Return mode lets you compare a fixed annual rate, the original 14-year historical sequence, or randomized reshuffles of those same historical returns. Horizon sets how many years the simulation runs before showing the ending balance or depletion point.">?</button>
           </div>
           <div class="mode-row">
             <span class="mode-label">Return mode</span>
@@ -455,6 +514,7 @@
               <div class="section-title">Core Inputs</div>
               <div class="section-note">These are the primary assumptions that drive every result panel on the right.</div>
             </div>
+            <button class="section-help" type="button" aria-label="Core inputs help" title="Starting capital is your initial portfolio value in dollars. Monthly spend is your spending in today’s dollars, and Annual rate is the fixed return assumption used only in Fixed rate mode.">?</button>
           </div>
           <div class="control-row">
             <label>Starting capital ($)</label>
@@ -483,6 +543,7 @@
               <div class="section-title">Income & Bridge</div>
               <div class="section-note">Offset spending with Social Security and spend down runway cash before the portfolio is tapped.</div>
             </div>
+            <button class="section-help" type="button" aria-label="Income and bridge help" title="Social Security is entered in today’s dollars and can begin after a delay in months. Cash runway is a separate bridge fund available up front that grows at 3.0% annually and is spent before portfolio withdrawals begin.">?</button>
           </div>
           <div class="control-row">
             <label>SS payment ($/mo)</label>
@@ -507,6 +568,7 @@
               <div class="section-title">Adjustments</div>
               <div class="section-note">Use optional modifiers to model purchasing power drift and guardrail-based spending changes.</div>
             </div>
+            <button class="section-help" type="button" aria-label="Adjustments help" title="Inflation adjustment increases spending and Social Security each year using the selected annual inflation rate. Spending guardrails apply Guyton-Klinger style rules, cutting spending 10% if the current withdrawal rate rises above 120% of the initial rate and boosting it 10% if it falls below 80%.">?</button>
           </div>
           <div class="control-row" style="margin-bottom:0;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-width:100%;">
@@ -543,6 +605,7 @@
               <div class="section-title">Random Analysis</div>
               <div class="section-note">Bootstrapped historical returns drawn in random order, refilling each cycle.</div>
             </div>
+            <button class="section-help" type="button" aria-label="Random analysis help" title="Run Analysis performs 500 independent reshuffles of the same 14 historical returns and visualizes the distribution of outcomes. The safe-spend finder searches for the highest monthly spend that still meets your selected survival target across those randomized runs.">?</button>
           </div>
           <div class="analysis-actions" style="margin-bottom:0;">
             <p class="mode-note">Run a 500-path distribution analysis or search for the highest monthly spend that still meets your survival target.</p>
@@ -571,13 +634,6 @@
     </aside>
 
     <main class="workspace" data-region="results">
-      <div class="workspace-header">
-        <div>
-          <div class="workspace-title">Results Workspace</div>
-          <div class="workspace-copy">Cards provide the headline outcome, the chart acts as the main visual, and the tables below are the drill-down layers.</div>
-        </div>
-      </div>
-
       <div class="results-stack">
         <div class="cards" id="cards"></div>
 
@@ -632,22 +688,6 @@
           </div>
         </section>
 
-        <section class="table-wrap seq-ref" id="seq-ref" style="display:none;" data-panel="sequence-reference">
-          <div class="table-title">14-year sequence reference</div>
-          <div class="scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th style="text-align:left;">Seq yr</th>
-                  <th>Annual return</th>
-                  <th>From cumulative</th>
-                  <th>To cumulative</th>
-                </tr>
-              </thead>
-              <tbody id="seq-tbody"></tbody>
-            </table>
-          </div>
-        </section>
       </div>
     </main>
   </div>
@@ -713,6 +753,7 @@ function fmtD(n)   { return '$' + Math.round(n).toLocaleString(); }
 function onInputChange() {
   if (mcAnalysisActive) resetAnalysis();
   calculate();
+  updateYearlyTableHeight();
 }
 
 function onInflationToggle() {
@@ -731,6 +772,7 @@ function reshuffle() {
   shuffledSequence = buildFullRandomSequence();
   resetAnalysis();
   calculate();
+  updateYearlyTableHeight();
 }
 
 function findSafeWithdrawal() {
@@ -830,6 +872,36 @@ function setHorizon(n) {
   );
   resetAnalysis();
   calculate();
+  updateYearlyTableHeight();
+}
+
+function updateResultsLayout() {
+  const resultsStack = document.querySelector('.results-stack');
+  if (!resultsStack) return;
+  resultsStack.classList.add('table-fill');
+}
+
+function updateYearlyTableHeight() {
+  const tablePanel = document.querySelector('[data-panel="yearly-table"]');
+  if (!tablePanel) return;
+  const scroll = tablePanel.querySelector('.scroll');
+  const title = tablePanel.querySelector('.table-title');
+  if (!scroll || !title) return;
+
+  if (window.innerWidth <= 1280) {
+    tablePanel.style.minHeight = '';
+    scroll.style.maxHeight = '';
+    return;
+  }
+
+  const panelRect = tablePanel.getBoundingClientRect();
+  const titleRect = title.getBoundingClientRect();
+  const viewportBottom = window.innerHeight - 24;
+  const available = Math.max(260, Math.floor(viewportBottom - panelRect.top));
+  const scrollHeight = Math.max(180, available - Math.ceil(titleRect.height) - 8);
+
+  tablePanel.style.minHeight = `${available}px`;
+  scroll.style.maxHeight = `${scrollHeight}px`;
 }
 
 function setMode(m) {
@@ -838,28 +910,12 @@ function setMode(m) {
   document.getElementById('fixed-panel').style.display  = m === 'fixed' ? '' : 'none';
   document.getElementById('seq-panel').style.display    = m === 'seq'   ? '' : 'none';
   document.getElementById('rand-panel').style.display   = m === 'rand'  ? '' : 'none';
-  document.getElementById('seq-ref').style.display      = m === 'seq'   ? '' : 'none';
   document.getElementById('th-seq').style.display       = (m === 'seq' || m === 'rand') ? '' : 'none';
+  updateResultsLayout();
   resetAnalysis();
-  if (m === 'seq') buildSeqTable();
   if (m === 'rand' && shuffledSequence.length === 0) reshuffle();
   else calculate();
-}
-
-function buildSeqTable() {
-  const tbody = document.getElementById('seq-tbody');
-  tbody.innerHTML = '';
-  for (let i = 0; i < ANNUAL_RETURNS.length; i++) {
-    const r = ANNUAL_RETURNS[i];
-    const fromC = i === 0 ? '0.0' : CUMULATIVE[i-1].toFixed(1);
-    const cls = r >= 0 ? 'green' : 'red';
-    tbody.innerHTML += `<tr>
-      <td style="text-align:left;">${i+1}</td>
-      <td class="${cls}">${r>=0?'+':''}${(r*100).toFixed(1)}%</td>
-      <td class="muted">+${fromC}%</td>
-      <td class="muted">+${CUMULATIVE[i].toFixed(1)}%</td>
-    </tr>`;
-  }
+  updateYearlyTableHeight();
 }
 
 // ─── Core simulation ─────────────────────────────────────────────────────────
@@ -1299,7 +1355,11 @@ function buildYearTable(rows, showSS, showBridge, inflationRate = 0, guardrailsO
   }).join('');
 }
 
+window.addEventListener('resize', updateYearlyTableHeight);
+
+updateResultsLayout();
 calculate();
+updateYearlyTableHeight();
 </script>
 </body>
 </html>
