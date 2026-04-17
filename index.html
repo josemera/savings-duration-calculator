@@ -11,7 +11,7 @@
   :root {
     --bg: #06111f;
     --bg-alt: #0a1627;
-    --top-rail-height: 124px;
+    --top-rail-height: 88px;
     --panel: rgba(11, 24, 40, 0.9);
     --panel-strong: rgba(15, 31, 49, 0.96);
     --panel-soft: rgba(10, 20, 33, 0.78);
@@ -285,19 +285,20 @@
   .run-analysis-btn:hover { background: rgba(8, 82, 118, 0.98); color: #e0f2fe; }
 
   .results-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
   .card {
     background: rgba(10, 20, 33, 0.84);
     border-radius: 16px;
-    padding: 14px 16px;
+    padding: 9px 10px;
     border: 1px solid rgba(148, 184, 226, 0.12);
     height: var(--top-rail-height);
     display: flex;
     flex-direction: column;
     justify-content: center;
+    min-width: 0;
   }
-  .card-label { color: var(--muted); font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
-  .card-value { font-weight: 700; font-size: 21px; }
+  .card-label { color: var(--muted); font-size: 8px; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .card-value { font-weight: 700; font-size: 14px; line-height: 1.15; }
   .card-value.green  { color: #4ade80; }
   .card-value.red    { color: #f87171; }
   .card-value.blue   { color: #7dd3fc; }
@@ -547,7 +548,9 @@
           </div>
           <div class="control-row">
             <label>SS payment ($/mo)</label>
-            <input type="number" id="ss-amount" value="0" oninput="onInputChange()" />
+            <input type="range" min="0" max="10000" step="100" value="0" id="ss-amount"
+              oninput="document.getElementById('ssAmountVal').textContent='$'+parseFloat(this.value).toLocaleString();onInputChange()" />
+            <span class="range-val" id="ssAmountVal">$0</span>
           </div>
           <div class="control-row">
             <label>SS starts in (months)</label>
@@ -557,7 +560,9 @@
           </div>
           <div class="control-row">
             <label>Cash runway ($)</label>
-            <input type="number" id="bridge-fund" value="0" oninput="onInputChange()" />
+            <input type="range" min="0" max="500000" step="5000" value="0" id="bridge-fund"
+              oninput="document.getElementById('bridgeFundVal').textContent='$'+parseFloat(this.value).toLocaleString();onInputChange()" />
+            <span class="range-val" id="bridgeFundVal">$0</span>
           </div>
           <p class="mode-note">Separate bridge fund that grows at 3.0% annually and is spent before portfolio withdrawals begin.</p>
         </section>
