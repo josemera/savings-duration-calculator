@@ -168,31 +168,30 @@
     background: var(--panel-soft);
     border: 1px solid rgba(148, 184, 226, 0.12);
     border-radius: 18px;
-    padding: 16px;
+    padding: 0 16px 16px;
+    overflow: hidden;
   }
   .section-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
-    margin-bottom: 18px;
+    margin: 0 -16px 16px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(148, 184, 226, 0.14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
   }
   .section-header > :first-child {
     min-width: 0;
     flex: 1 1 auto;
   }
   .section-title {
-    font-size: 15px;
+    font-size: 11px;
     font-weight: 700;
-    color: #dbeafe;
-    line-height: 1.2;
-    margin-bottom: 6px;
-  }
-  .section-note {
-    color: var(--muted-soft);
-    font-size: 12px;
-    line-height: 1.5;
-    max-width: 32ch;
+    color: #a9bdd4;
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
   }
   .section-help {
     position: relative;
@@ -204,7 +203,7 @@
     flex: 0 0 24px;
     border-radius: 50%;
     border: 1px solid rgba(148, 184, 226, 0.18);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.03);
     color: #bfe8ff;
     font-size: 12px;
     font-weight: 700;
@@ -304,16 +303,31 @@
   .card-value.blue   { color: #7dd3fc; }
   .card-value.purple { color: #c084fc; }
 
-  .chart-wrap { padding: 18px 18px 14px; }
+  .chart-wrap { padding: 0 18px 14px; overflow: hidden; }
   .panel-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 12px;
+    margin: 0 -18px 16px;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid rgba(148, 184, 226, 0.14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
   }
-  .panel-head .panel-title { margin-bottom: 2px; }
-  .chart-wrap canvas { max-height: 320px; }
+  .panel-head .panel-title {
+    margin-bottom: 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: #a9bdd4;
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .chart-wrap canvas {
+    width: 100% !important;
+    height: 352px !important;
+    max-height: none;
+  }
 
   .table-wrap { overflow: hidden; }
   .table-title { padding: 14px 18px; border-bottom: 1px solid rgba(148, 184, 226, 0.12); font-size: 13px; color: #e2e8f0; font-weight: 700; }
@@ -398,6 +412,11 @@
     flex-direction: column;
     overflow: hidden;
   }
+  .results-stack.table-fill > .cards,
+  .results-stack.table-fill > .chart-wrap,
+  .results-stack.table-fill > .mc-section {
+    flex: 0 0 auto;
+  }
   .results-stack.table-fill .table-wrap[data-panel="yearly-table"] {
     flex: 1 1 auto;
     min-height: 0;
@@ -477,14 +496,12 @@
       <section class="controls" data-panel="controls">
         <div class="panel-header">
           <div class="panel-title">Scenario Builder</div>
-          <div class="panel-subtitle">Grouped controls keep the UI modular now and map cleanly to future sidebar components in Electron + Preact.</div>
         </div>
 
         <section class="control-section" data-section="scenario">
           <div class="section-header">
             <div>
               <div class="section-title">Scenario</div>
-              <div class="section-note">Choose the return model and planning horizon.</div>
             </div>
             <button class="section-help" type="button" aria-label="Scenario help" title="Return mode lets you compare a fixed annual rate, the original 14-year historical sequence, or randomized reshuffles of those same historical returns. Horizon sets how many years the simulation runs before showing the ending balance or depletion point.">?</button>
           </div>
@@ -513,7 +530,6 @@
           <div class="section-header">
             <div>
               <div class="section-title">Core Inputs</div>
-              <div class="section-note">These are the primary assumptions that drive every result panel on the right.</div>
             </div>
             <button class="section-help" type="button" aria-label="Core inputs help" title="Starting capital is your initial portfolio value in dollars. Monthly spend is your spending in today’s dollars, and Annual rate is the fixed return assumption used only in Fixed rate mode.">?</button>
           </div>
@@ -542,7 +558,6 @@
           <div class="section-header">
             <div>
               <div class="section-title">Income & Bridge</div>
-              <div class="section-note">Offset spending with Social Security and spend down runway cash before the portfolio is tapped.</div>
             </div>
             <button class="section-help" type="button" aria-label="Income and bridge help" title="Social Security is entered in today’s dollars and can begin after a delay in months. Cash runway is a separate bridge fund available up front that grows at 3.0% annually and is spent before portfolio withdrawals begin.">?</button>
           </div>
@@ -564,14 +579,12 @@
               oninput="document.getElementById('bridgeFundVal').textContent='$'+parseFloat(this.value).toLocaleString();onInputChange()" />
             <span class="range-val" id="bridgeFundVal">$0</span>
           </div>
-          <p class="mode-note">Separate bridge fund that grows at 3.0% annually and is spent before portfolio withdrawals begin.</p>
         </section>
 
         <section class="control-section" data-section="adjustments">
           <div class="section-header">
             <div>
               <div class="section-title">Adjustments</div>
-              <div class="section-note">Use optional modifiers to model purchasing power drift and guardrail-based spending changes.</div>
             </div>
             <button class="section-help" type="button" aria-label="Adjustments help" title="Inflation adjustment increases spending and Social Security each year using the selected annual inflation rate. Spending guardrails apply Guyton-Klinger style rules, cutting spending 10% if the current withdrawal rate rises above 120% of the initial rate and boosting it 10% if it falls below 80%.">?</button>
           </div>
@@ -589,7 +602,6 @@
                 oninput="document.getElementById('inflationVal').textContent=parseFloat(this.value).toFixed(1)+'%';onInputChange()" />
               <span class="range-val" id="inflationVal">3.0%</span>
             </div>
-            <p class="mode-note">Spending and SS grow at this rate annually. Returns are nominal, so there’s no double-counting.</p>
           </div>
           <hr class="divider">
           <div class="control-row" style="margin-bottom:0;">
@@ -600,7 +612,6 @@
             </label>
           </div>
           <div id="guardrails-panel" style="display:none;margin-top:14px;">
-            <p class="mode-note">Guyton-Klinger: cut 10% if withdrawal rate rises above 120% of initial; boost 10% if it drops below 80%.</p>
           </div>
         </section>
 
@@ -608,12 +619,10 @@
           <div class="section-header">
             <div>
               <div class="section-title">Random Analysis</div>
-              <div class="section-note">Bootstrapped historical returns drawn in random order, refilling each cycle.</div>
             </div>
             <button class="section-help" type="button" aria-label="Random analysis help" title="Run Analysis performs 500 independent reshuffles of the same 14 historical returns and visualizes the distribution of outcomes. The safe-spend finder searches for the highest monthly spend that still meets your selected survival target across those randomized runs.">?</button>
           </div>
           <div class="analysis-actions" style="margin-bottom:0;">
-            <p class="mode-note">Run a 500-path distribution analysis or search for the highest monthly spend that still meets your survival target.</p>
             <div class="analysis-action-row">
               <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
               <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
@@ -646,7 +655,6 @@
           <div class="panel-head">
             <div>
               <div class="panel-title">Balance Trajectory</div>
-              <div class="panel-subtitle">The main visual stays centered in the right workspace, making it the natural focal point.</div>
             </div>
           </div>
           <canvas id="chart"></canvas>
@@ -994,10 +1002,12 @@ function calculate() {
 
   // Build labels
   const labels = ['Start'];
+  const tooltipLabels = ['Start'];
   for (let y = 0; y < MAX_YEARS; y++) {
     const r = yearRows[y];
     const seqLabel = r && r.seqYr !== null ? ` [S${r.seqYr}]` : '';
-    labels.push(`Yr ${y+1}${seqLabel}`);
+    labels.push(`Yr ${y+1}`);
+    tooltipLabels.push(`Yr ${y+1}${seqLabel}`);
   }
 
   // Stat cards
@@ -1036,7 +1046,7 @@ function calculate() {
   if (mcAnalysisActive && mcRuns.length > 0) {
     drawFanChart();
   } else {
-    drawChart(labels, balData, inflationRate);
+    drawChart(labels, balData, inflationRate, tooltipLabels);
   }
 }
 
@@ -1137,6 +1147,9 @@ function drawFanChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
+      layout: {
+        padding: { top: 6, right: 8, bottom: 10, left: 4 }
+      },
       plugins: {
         legend: {
           display: true, position: 'top',
@@ -1199,6 +1212,9 @@ function drawScatter(tab) {
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
+      layout: {
+        padding: { top: 6, right: 8, bottom: 10, left: 4 }
+      },
       onClick: (evt, elements) => {
         if (!elements.length) return;
         const el  = elements[0];
@@ -1256,7 +1272,7 @@ function drawScatter(tab) {
 
 // ─── Single-run chart ────────────────────────────────────────────────────────
 
-function drawChart(labels, balData, inflationRate = 0) {
+function drawChart(labels, balData, inflationRate = 0, tooltipLabels = labels) {
   if (chartInstance) chartInstance.destroy();
   const color = mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
   const bg    = mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
@@ -1269,12 +1285,19 @@ function drawChart(labels, balData, inflationRate = 0) {
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
+      layout: {
+        padding: { top: 6, right: 8, bottom: 10, left: 4 }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
           titleColor: '#d1d5db', bodyColor: '#fff',
           callbacks: {
+            title: items => {
+              const idx = items && items.length ? items[0].dataIndex : 0;
+              return tooltipLabels[idx] || labels[idx] || '';
+            },
             label: c => {
               const nominal = c.parsed.y;
               const lines = [' Balance: $' + nominal.toLocaleString()];
