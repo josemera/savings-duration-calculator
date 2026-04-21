@@ -10,7 +10,7 @@ A single-file, client-side web app that models how long a portfolio will last un
 
 ## What it does
 
-You provide a starting capital, a monthly spending amount, an optional bridge fund, and optional Social Security income. The calculator simulates your portfolio balance year by year for up to 30 years and tells you either when it runs out or what it grows to.
+You provide an invested/equity starting capital, an optional cash reserve, a monthly spending amount, and optional Social Security income. The calculator simulates your portfolio balance year by year for up to 30 years and tells you either when it runs out or what it grows to.
 
 Three return modes let you stress-test different scenarios:
 
@@ -18,7 +18,7 @@ Three return modes let you stress-test different scenarios:
 Classic calculation using a single annual return rate (0–15%), applied monthly via compound growth. Good for a quick baseline.
 
 ### Historical sequence
-Uses 14 real annual returns derived from the actual cumulative performance of a real portfolio, starting in January 2012. The portfolio composition at the time the returns were recorded was:
+Uses 14 real annual returns from the historical portfolio's total-return column, starting in January 2012. The portfolio composition at the time the returns were recorded was:
 
 | Ticker | Allocation | Description |
 |--------|-----------|-------------|
@@ -31,19 +31,19 @@ Uses 14 real annual returns derived from the actual cumulative performance of a 
 | SMH    | 5%        | VanEck Semiconductor ETF |
 | VGT    | 5%        | Vanguard Information Technology ETF |
 
-Returns are applied in order and cycle after year 14. The sequence captures the actual sequence-of-returns effect of this allocation — including a significant down year (~−20%) partway through the cycle.
+Returns are applied in order and cycle after year 14. The sequence captures the actual sequence-of-returns effect of this allocation — including a significant down year (~−21%) partway through the cycle.
 
-The 14 derived annual returns are:
+The 14 annual total returns are:
 
-| Seq | Return | | Seq | Return |
-|-----|--------|-|-----|--------|
-| 1   | +13.0% | | 8   | +32.8% |
-| 2   | +28.5% | | 9   | +23.1% |
-| 3   | +18.1% | | 10  | +39.9% |
-| 4   | −0.8%  | | 11  | −19.8% |
-| 5   | +16.6% | | 12  | +28.9% |
-| 6   | +21.2% | | 13  | +34.1% |
-| 7   | −3.8%  | | 14  | +21.5% |
+| Seq | Year | Return | | Seq | Year | Return |
+|-----|------|--------|-|-----|------|--------|
+| 1   | 2012 | +11.9% | | 8   | 2019 | +39.8% |
+| 2   | 2013 | +32.9% | | 9   | 2020 | +30.9% |
+| 3   | 2014 | +16.4% | | 10  | 2021 | +34.2% |
+| 4   | 2015 | +0.3%  | | 11  | 2022 | −21.0% |
+| 5   | 2016 | +19.0% | | 12  | 2023 | +36.1% |
+| 6   | 2017 | +26.3% | | 13  | 2024 | +27.8% |
+| 7   | 2018 | −5.9%  | | 14  | 2025 | +28.9% |
 
 ### Random Sequence
 Takes the same 14 historical returns but draws them in a random order, refilling and reshuffling the pool every 14 years. Hit **Reshuffle ↺** to run a new scenario.
@@ -103,8 +103,6 @@ An optional toggle in the controls panel. When enabled, a slider sets the annual
 
 **Social Security income** also grows at the inflation rate, starting from year 0 in today's dollars. This matches how SS Cost of Living Adjustments (COLA) work by law: the benefit accrues real value from the day you enter it, even during the delay period before payments begin. A $2,000/month SS benefit entered today will be worth ~$2,312/month when it starts five years from now.
 
-**Cash runway / bridge fund** is a separate up-front cash pool that grows at a fixed 3.0% annual rate and is spent before the portfolio is tapped. This lets you model a short-term bridge strategy without folding that cash into the invested starting capital.
-
 ### Why this doesn't double-count returns
 
 The 14 historical returns used by this calculator are **nominal** — inflation was already embedded in the market performance of those years. Applying a separate inflation rate to spending is therefore correct: you're modeling a portfolio that grows at historical nominal rates while expenses rise in nominal terms alongside them.
@@ -123,10 +121,11 @@ When inflation is active, two additional outputs appear:
 
 | Input | Description |
 |-------|-------------|
-| Starting capital | Your initial portfolio value in dollars |
+| Starting capital | Your invested/equity sleeve value in dollars |
+| Cash reserve | Separate cash sleeve included in total portfolio balance |
+| Cash interest | Annual cash-sleeve interest rate, selectable from 0% to 8% |
 | Monthly spend | Your spending in today's dollars (grown by inflation if enabled) |
 | Annual rate | Fixed return rate (Fixed rate mode only) |
-| Cash runway | Separate bridge fund available up front, spent before portfolio withdrawals and grown at 3.0% annually |
 | SS payment | Monthly Social Security income in today's dollars |
 | SS starts in | How many months until SS payments begin (slider, 0–120) |
 | Inflation adjustment | Optional toggle to enable inflation. Slider sets annual rate (default 3.0%) |
@@ -135,7 +134,7 @@ When inflation is active, two additional outputs appear:
 
 ## Output
 
-**Stat cards** — balance at year 30 (or depletion year), total interest earned, total portfolio gain/loss %, bridge fund used if applicable, SS income received if applicable, and real value in today's dollars if inflation is enabled.
+**Stat cards** — balance at year 30 (or depletion year), total interest earned across equity and cash sleeves, total portfolio gain/loss %, SS income received if applicable, and real value in today's dollars if inflation is enabled.
 
 **Chart** — 30-year balance trajectory. Line color indicates mode: green (fixed), blue (historical), purple (Random Sequence). In Random Sequence mode after running the distribution analysis, the chart shows a percentile fan (p10/median/p90) instead of a single line. When inflation is enabled, hovering over any point shows both the nominal balance and its real value in today's dollars.
 
@@ -144,7 +143,6 @@ When inflation is active, two additional outputs appear:
 - Annual return applied
 - Interest earned
 - SS income received (inflation-adjusted when enabled)
-- Bridge fund used (when applicable)
 - Portfolio withdrawals (inflation-adjusted when enabled)
 - Net change
 - Ending balance
@@ -156,9 +154,9 @@ When inflation is active, two additional outputs appear:
 
 ## How returns are applied
 
-Each year's annual return is converted to a monthly compounding rate (`(1 + r)^(1/12) - 1`) and applied month by month. Portfolio withdrawals, bridge-fund usage, and SS income are processed each month against the current balances — so the timing of gains and losses within a year affects the result, rather than treating it as a year-end lump sum.
+Each year's annual return is converted to a monthly compounding rate (`(1 + r)^(1/12) - 1`) and applied month by month to the invested/equity sleeve. The optional cash reserve compounds monthly at the selected cash interest rate. Portfolio withdrawals and SS income are processed each month against the current balances — so the timing of gains and losses within a year affects the result, rather than treating it as a year-end lump sum.
 
-Social Security income offsets spending each month first. Any remaining spending need is then covered by the bridge fund before the portfolio is tapped. In other words, the portfolio only sees `max(0, monthly spend − SS payment − bridge available that month)` as a withdrawal. If SS and/or the bridge fund fully cover monthly expenses, the portfolio is not drawn down during those months.
+Social Security income offsets spending each month first. Any remaining spending need is then covered by the cash reserve, then the invested/equity sleeve. In other words, the invested sleeve only sees withdrawals after SS and portfolio cash have been used. If SS and/or the cash reserve fully cover monthly expenses, the invested sleeve is not drawn down during those months.
 
 ---
 
