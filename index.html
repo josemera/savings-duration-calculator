@@ -648,10 +648,13 @@
           </div>
           <div id="mc-inputs-panel" style="display:none;">
             <p class="mode-note" style="margin-bottom:12px;">Samples annual returns from a normal distribution. Start with a preset or adjust the parameters below.</p>
-            <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
               <button class="toggle-btn active" id="mc-preset-equity" style="border-radius:10px;flex:1;font-size:11px;" onclick="applyMCPreset('equity')">Equity</button>
               <button class="toggle-btn" id="mc-preset-balanced" style="border-radius:10px;flex:1;font-size:11px;" onclick="applyMCPreset('balanced')">Balanced</button>
               <button class="toggle-btn" id="mc-preset-aggressive" style="border-radius:10px;flex:1;font-size:11px;" onclick="applyMCPreset('aggressive')">Aggressive</button>
+            </div>
+            <div style="margin-bottom:10px;">
+              <button class="toggle-btn" id="mc-preset-stress" style="border-radius:10px;width:100%;font-size:11px;border-color:rgba(251,146,60,0.4);color:#fb923c;" onclick="applyMCPreset('stress')">Stress Test — market avg returns, high volatility</button>
             </div>
             <div class="control-row">
               <label>Expected return (%/yr)</label>
@@ -664,6 +667,24 @@
               <input type="range" min="0" max="50" step="0.5" value="17" id="mc-volatility"
                 oninput="document.getElementById('mcVolatilityVal').textContent=parseFloat(this.value).toFixed(1)+'%';onMCParamChange()" />
               <span class="range-val" id="mcVolatilityVal">17.0%</span>
+            </div>
+            <div class="control-row">
+              <label>Mean reversion</label>
+              <input type="range" min="0" max="0.5" step="0.05" value="0.25" id="mc-mean-rev"
+                oninput="document.getElementById('mcMeanRevVal').textContent=parseFloat(this.value).toFixed(2);onMCParamChange()" />
+              <span class="range-val" id="mcMeanRevVal">0.25</span>
+            </div>
+            <div class="control-row">
+              <label>Max annual loss (%)</label>
+              <input type="range" min="10" max="60" step="1" value="35" id="mc-max-loss"
+                oninput="document.getElementById('mcMaxLossVal').textContent=parseFloat(this.value).toFixed(0)+'%';onMCParamChange()" />
+              <span class="range-val" id="mcMaxLossVal">35%</span>
+            </div>
+            <div class="control-row">
+              <label>Max annual gain (%)</label>
+              <input type="range" min="20" max="100" step="1" value="50" id="mc-max-gain"
+                oninput="document.getElementById('mcMaxGainVal').textContent=parseFloat(this.value).toFixed(0)+'%';onMCParamChange()" />
+              <span class="range-val" id="mcMaxGainVal">50%</span>
             </div>
           </div>
         </section>
@@ -772,8 +793,9 @@
           <div class="mc-section-header">
             <span class="mc-section-title">500-Run Distribution</span>
             <div class="toggle-group">
-              <button class="toggle-btn active" id="scatter-tab-outcome"  onclick="switchScatterTab('histogram')">Histogram</button>
-              <button class="toggle-btn"        id="scatter-tab-timeline" onclick="switchScatterTab('survival')">Survival</button>
+              <button class="toggle-btn active" id="scatter-tab-outcome"    onclick="switchScatterTab('histogram')">Histogram</button>
+              <button class="toggle-btn"        id="scatter-tab-timeline"   onclick="switchScatterTab('survival')">Survival</button>
+              <button class="toggle-btn"        id="scatter-tab-depletions" onclick="switchScatterTab('depletions')">Depletions</button>
             </div>
           </div>
           <div class="mc-cards-wrap">
@@ -848,8 +870,9 @@ function buildFullRandomSequence() {
   return seq.slice(0, MAX_YEARS);
 }
 
-function sampleNormalAnnualReturns(mean, volatility, years) {
+function sampleNormalAnnualReturns(mean, volatility, years, meanRevCoeff = 0, maxLoss = 0.999, maxGain = 9.999) {
   const results = [];
+  let prevReturn = mean;
   for (let i = 0; i < years; i++) {
     let u, v, s;
     do {
@@ -858,24 +881,30 @@ function sampleNormalAnnualReturns(mean, volatility, years) {
       s = u * u + v * v;
     } while (s >= 1 || s === 0);
     const z = u * Math.sqrt(-2 * Math.log(s) / s);
-    results.push(Math.max(-0.999, mean + volatility * z));
+    const adjustedMean = mean + meanRevCoeff * (mean - prevReturn);
+    const r = Math.min(maxGain, Math.max(-maxLoss, adjustedMean + volatility * z));
+    results.push(r);
+    prevReturn = r;
   }
   return results;
 }
 
 function buildFullMCSequence() {
-  const mean = parseFloat(document.getElementById('mc-mean-return').value) / 100;
-  const vol  = parseFloat(document.getElementById('mc-volatility').value)  / 100;
-  return sampleNormalAnnualReturns(mean, vol, MAX_YEARS).map(r => ({ r, origIdx: null }));
+  const mean    = parseFloat(document.getElementById('mc-mean-return').value) / 100;
+  const vol     = parseFloat(document.getElementById('mc-volatility').value)  / 100;
+  const meanRev = parseFloat(document.getElementById('mc-mean-rev').value);
+  const maxLoss = parseFloat(document.getElementById('mc-max-loss').value)    / 100;
+  const maxGain = parseFloat(document.getElementById('mc-max-gain').value)    / 100;
+  return sampleNormalAnnualReturns(mean, vol, MAX_YEARS, meanRev, maxLoss, maxGain).map(r => ({ r, origIdx: null }));
 }
 
 function applyMCPreset(preset) {
-  ['equity','balanced','aggressive'].forEach(id =>
+  ['equity','balanced','aggressive','stress'].forEach(id =>
     document.getElementById('mc-preset-' + id).classList.toggle('active', id === preset)
   );
   const meanInput = document.getElementById('mc-mean-return');
   const volInput  = document.getElementById('mc-volatility');
-  const presets = { equity: [10, 17], balanced: [8, 12], aggressive: [19, 21] };
+  const presets = { equity: [10, 17], balanced: [8, 12], aggressive: [19, 21], stress: [10, 28] };
   const [mean, vol] = presets[preset];
   meanInput.value = mean; volInput.value = vol;
   document.getElementById('mcMeanVal').textContent = mean.toFixed(1) + '%';
@@ -938,9 +967,12 @@ function findSafeWithdrawal() {
   const guardrailsOn = document.getElementById('guardrails-toggle').checked;
   const target       = parseFloat(document.getElementById('finder-target').value) / 100;
   if (capital <= 0 && cashReserve <= 0) return;
-  const isMC   = mode === 'mc';
-  const mcMean = isMC ? parseFloat(document.getElementById('mc-mean-return').value) / 100 : 0;
-  const mcVol  = isMC ? parseFloat(document.getElementById('mc-volatility').value)  / 100 : 0;
+  const isMC      = mode === 'mc';
+  const mcMean    = isMC ? parseFloat(document.getElementById('mc-mean-return').value) / 100 : 0;
+  const mcVol     = isMC ? parseFloat(document.getElementById('mc-volatility').value)  / 100 : 0;
+  const mcMeanRev = isMC ? parseFloat(document.getElementById('mc-mean-rev').value)         : 0;
+  const mcMaxLoss = isMC ? parseFloat(document.getElementById('mc-max-loss').value) / 100   : 0.999;
+  const mcMaxGain = isMC ? parseFloat(document.getElementById('mc-max-gain').value) / 100   : 9.999;
 
   const resultEl = document.getElementById('finder-result');
   resultEl.style.display = '';
@@ -953,7 +985,7 @@ function findSafeWithdrawal() {
       let survived = 0;
       for (let i = 0; i < RUNS; i++) {
         const seq = isMC
-          ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS).map(r => ({ r, origIdx: null }))
+          ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS, mcMeanRev, mcMaxLoss, mcMaxGain).map(r => ({ r, origIdx: null }))
           : buildFullRandomSequence();
         const r = simulateSequence(capital, spend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn, cashReserve, cashRate);
         if (!r.depleted) survived++;
@@ -984,7 +1016,7 @@ function findSafeWithdrawal() {
     let verifiedSurvived = 0;
     for (let i = 0; i < RUNS; i++) {
       const seq = isMC
-        ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS).map(r => ({ r, origIdx: null }))
+        ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS, mcMeanRev, mcMaxLoss).map(r => ({ r, origIdx: null }))
         : buildFullRandomSequence();
       const r = simulateSequence(capital, bestSpend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn, cashReserve, cashRate);
       if (!r.depleted) verifiedSurvived++;
@@ -1225,14 +1257,17 @@ function runMonteCarloAnalysis() {
   const guardrailsOn  = document.getElementById('guardrails-toggle').checked;
   if (capital + cashReserve <= 0 || monthly <= 0) return;
 
-  const isMC   = mode === 'mc';
-  const mcMean = isMC ? parseFloat(document.getElementById('mc-mean-return').value) / 100 : 0;
-  const mcVol  = isMC ? parseFloat(document.getElementById('mc-volatility').value)  / 100 : 0;
+  const isMC      = mode === 'mc';
+  const mcMean    = isMC ? parseFloat(document.getElementById('mc-mean-return').value) / 100 : 0;
+  const mcVol     = isMC ? parseFloat(document.getElementById('mc-volatility').value)  / 100 : 0;
+  const mcMeanRev = isMC ? parseFloat(document.getElementById('mc-mean-rev').value)         : 0;
+  const mcMaxLoss = isMC ? parseFloat(document.getElementById('mc-max-loss').value) / 100   : 0.999;
+  const mcMaxGain = isMC ? parseFloat(document.getElementById('mc-max-gain').value) / 100   : 9.999;
 
   mcRuns = [];
   for (let i = 0; i < 500; i++) {
     const seq = isMC
-      ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS).map(r => ({ r, origIdx: null }))
+      ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS, mcMeanRev, mcMaxLoss, mcMaxGain).map(r => ({ r, origIdx: null }))
       : buildFullRandomSequence();
     const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate, guardrailsOn, cashReserve, cashRate);
     mcRuns.push({ seq, ...result });
@@ -1324,8 +1359,21 @@ function loadRun(runIdx) {
   // Label the table to show which run is being inspected
   const resetHint = mode === 'mc' ? 'Sample New Path ↺' : 'Reshuffle ↺';
   const runLabel  = run.depleted ? `depleted Yr ${run.depletedYear}` : `survived · $${fmt0(run.finalBal)}`;
+
+  const depletedSorted = mcRuns
+    .map((r, i) => ({ runIdx: i, depletedYear: r.depletedYear, depleted: r.depleted }))
+    .filter(r => r.depleted)
+    .sort((a, b) => a.depletedYear - b.depletedYear || a.runIdx - b.runIdx);
+  const depPos = run.depleted ? depletedSorted.findIndex(r => r.runIdx === runIdx) : -1;
+  const prevDep = depPos > 0 ? depletedSorted[depPos - 1] : null;
+  const nextDep = (depPos >= 0 && depPos < depletedSorted.length - 1) ? depletedSorted[depPos + 1] : null;
+  const navStyle = 'background:none;border:none;color:#60a5fa;cursor:pointer;font-size:11px;padding:0 4px;';
+  const prevBtn  = prevDep ? `<button style="${navStyle}" onclick="loadRun(${prevDep.runIdx})">◀ Yr ${prevDep.depletedYear}</button>` : '';
+  const nextBtn  = nextDep ? `<button style="${navStyle}" onclick="loadRun(${nextDep.runIdx})">Yr ${nextDep.depletedYear} ▶</button>` : '';
+  const navHtml  = (prevBtn || nextBtn) ? ` · ${prevBtn}${nextBtn}` : '';
+
   document.getElementById('yr-table-title').innerHTML =
-    `Yearly breakdown <span style="font-size:11px;font-weight:400;color:#6b7280;">· Run #${runIdx + 1} — ${runLabel} · Click ${resetHint} or Run Analysis ▶ to return</span>`;
+    `Yearly breakdown <span style="font-size:11px;font-weight:400;color:#6b7280;">· Run #${runIdx + 1} — ${runLabel}${navHtml} · Click ${resetHint} or Run Analysis ▶ to return</span>`;
 
   // Chart from stored balData
   const labels = ['Start'], tooltipLabels = ['Start'];
@@ -1404,8 +1452,9 @@ function drawFanChart() {
 
 function switchScatterTab(tab) {
   activeScatterTab = tab;
-  document.getElementById('scatter-tab-outcome').classList.toggle('active',  tab === 'histogram');
-  document.getElementById('scatter-tab-timeline').classList.toggle('active', tab === 'survival');
+  document.getElementById('scatter-tab-outcome').classList.toggle('active',    tab === 'histogram');
+  document.getElementById('scatter-tab-timeline').classList.toggle('active',   tab === 'survival');
+  document.getElementById('scatter-tab-depletions').classList.toggle('active', tab === 'depletions');
   if (mcRuns.length > 0) drawScatter(tab);
 }
 
@@ -1442,18 +1491,18 @@ function drawScatter(tab) {
     const labels = Array.from({ length: BIN_COUNT }, (_, i) =>
       '$' + (i * binWidth >= 1000 ? ((i * binWidth) / 1000).toFixed(0) + 'k' : fmt0(i * binWidth)));
 
-    const survivedColors = survivedCounts.map((_, i) =>
-      i === selectedBin ? '#fbbf24' : 'rgba(74,222,128,0.55)');
-    const depletedColors = depletedCounts.map((_, i) =>
-      i === selectedBin ? '#fbbf24' : 'rgba(248,113,113,0.65)');
+    const borderColors = survivedCounts.map((_, i) =>
+      i === selectedBin ? '#fbbf24' : 'transparent');
+    const borderWidths = survivedCounts.map((_, i) =>
+      i === selectedBin ? 2 : 0);
 
     scatterInstance = new Chart(canvas, {
       type: 'bar',
       data: {
         labels,
         datasets: [
-          { label: 'Survived', data: survivedCounts, backgroundColor: survivedColors, stack: 'runs' },
-          { label: 'Depleted', data: depletedCounts, backgroundColor: depletedColors, stack: 'runs' },
+          { label: 'Survived', data: survivedCounts, backgroundColor: 'rgba(74,222,128,0.55)',  borderColor: borderColors, borderWidth: borderWidths, stack: 'runs' },
+          { label: 'Depleted', data: depletedCounts, backgroundColor: 'rgba(248,113,113,0.65)', borderColor: borderColors, borderWidth: borderWidths, stack: 'runs' },
         ]
       },
       options: {
@@ -1506,7 +1555,7 @@ function drawScatter(tab) {
       }
     });
 
-  } else {
+  } else if (tab === 'survival') {
     // Survival probability curve
     const survivalData = Array.from({ length: MAX_YEARS + 1 }, (_, yr) => {
       if (yr === 0) return 100;
@@ -1575,6 +1624,75 @@ function drawScatter(tab) {
             title: { display: true, text: 'Runs still solvent (%)', color: '#6b7280', font: { size: 11 } },
             ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v + '%' },
             grid: { color: '#1f2937' },
+          }
+        }
+      }
+    });
+
+  } else {
+    // Depletions tab — one dot per depleted run, stacked by depletion year
+    const depleted = mcRuns
+      .map((r, i) => ({ ...r, runIdx: i }))
+      .filter(r => r.depleted)
+      .sort((a, b) => a.depletedYear - b.depletedYear || a.runIdx - b.runIdx);
+
+    const yearCount = {};
+    depleted.forEach(r => {
+      yearCount[r.depletedYear] = (yearCount[r.depletedYear] || 0);
+      r.yPos = yearCount[r.depletedYear]++;
+    });
+
+    const pts = depleted.map(r => ({ x: r.depletedYear, y: r.yPos, runIdx: r.runIdx }));
+
+    scatterInstance = new Chart(canvas, {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: `${depleted.length} depleted run${depleted.length !== 1 ? 's' : ''}`,
+          data: pts,
+          backgroundColor: pts.map(p => p.runIdx === viewingRunIdx ? '#fbbf24' : 'rgba(248,113,113,0.75)'),
+          pointRadius:      pts.map(p => p.runIdx === viewingRunIdx ? 8 : 4),
+          pointBorderColor: pts.map(p => p.runIdx === viewingRunIdx ? '#ffffff' : 'transparent'),
+          pointBorderWidth: pts.map(p => p.runIdx === viewingRunIdx ? 2 : 0),
+          pointHoverRadius: 7,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        layout: { padding: { top: 6, right: 8, bottom: 4, left: 4 } },
+        onClick: (evt, elements) => {
+          if (!elements.length) return;
+          const pt = pts[elements[0].index];
+          if (pt) loadRun(pt.runIdx);
+        },
+        plugins: {
+          legend: commonLegend,
+          tooltip: {
+            ...commonTooltip,
+            callbacks: {
+              label: c => {
+                const run = mcRuns[c.raw.runIdx];
+                return [
+                  ` Run #${c.raw.runIdx + 1}`,
+                  ` Depleted: Yr ${run.depletedYear}`,
+                  ` Interest earned: $${fmt0(run.totalInterest)}`,
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear', min: 0, max: MAX_YEARS + 1,
+            title: { display: true, text: 'Year depleted', color: '#6b7280', font: { size: 11 } },
+            ticks: { color: '#6b7280', font: { size: 10 }, stepSize: 1,
+                     callback: v => (v > 0 && Number.isInteger(v)) ? `Yr ${v}` : '' },
+            grid: { color: '#1f2937' },
+          },
+          y: {
+            title: { display: false },
+            ticks: { display: false },
+            grid: { display: false },
           }
         }
       }
