@@ -284,6 +284,7 @@
   .mode-row:last-child { margin-bottom: 0; }
   .mode-label { color: #a9bdd4; font-size: 11px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.08em; }
   .toggle-group { display: flex; }
+  .mode-row .toggle-btn { padding: 9px 10px; font-size: 11px; }
   .toggle-btn {
     padding: 9px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
     border: 1px solid rgba(148, 184, 226, 0.16); background: rgba(15, 31, 49, 0.78); color: #8ca0b8;
@@ -417,6 +418,9 @@
     border: 1px solid rgba(56, 189, 248, 0.14);
     overflow: hidden;
   }
+  .mc-section.run-view .mc-cards-wrap,
+  .mc-section.run-view .mc-viewing-note { display: none; }
+  .mc-section.run-view .mc-scatter-wrap { padding: 10px 18px; max-height: 180px; }
   .mc-section-header {
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
     padding: 14px 18px; border-bottom: 1px solid rgba(56, 189, 248, 0.12);
@@ -559,7 +563,7 @@
       <section class="hero" data-panel="hero">
         <div class="hero-topline">
           <div class="eyebrow">Retirement Portfolio Planner</div>
-          <button class="hero-help" type="button" aria-label="About this calculator" data-tooltip="Model how long your savings last with fixed returns, historical sequencing, or randomized stress testing.">?</button>
+          <button class="hero-help" type="button" aria-label="About this calculator" data-tooltip="Model how long your savings last with fixed returns, historical sequencing, randomized reshuffles, or Monte Carlo simulation with a custom return distribution.">?</button>
         </div>
         <h1>Savings Duration Calculator</h1>
       </section>
@@ -574,14 +578,15 @@
             <div>
               <div class="section-title">Scenario</div>
             </div>
-            <button class="section-help" type="button" aria-label="Scenario help" data-tooltip="Return mode lets you compare a fixed annual rate, the original 14-year historical sequence, or randomized reshuffles of those same historical returns. Horizon sets how many years the simulation runs before showing the ending balance or depletion point.">?</button>
+            <button class="section-help" type="button" aria-label="Scenario help" data-tooltip="Return mode: Fixed uses one annual rate; Historical plays the 14-year sequence in order; Reshuffle randomizes those same 14 returns; Monte Carlo samples from a normal distribution you specify. Horizon sets how many years the simulation runs.">?</button>
           </div>
           <div class="mode-row">
             <span class="mode-label">Return mode</span>
             <div class="toggle-group">
-              <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed rate</button>
-              <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical sequence</button>
-              <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Random Sequence</button>
+              <button class="toggle-btn active" id="btn-fixed" onclick="setMode('fixed')">Fixed</button>
+              <button class="toggle-btn" id="btn-seq"   onclick="setMode('seq')">Historical</button>
+              <button class="toggle-btn" id="btn-rand"  onclick="setMode('rand')">Reshuffle</button>
+              <button class="toggle-btn" id="btn-mc"    onclick="setMode('mc')">Monte Carlo</button>
             </div>
           </div>
           <div class="mode-row">
@@ -640,6 +645,26 @@
           </div>
           <div id="seq-panel" style="display:none;">
             <p class="mode-note">Uses 14 historical annual returns in order, cycling after year 14.</p>
+          </div>
+          <div id="mc-inputs-panel" style="display:none;">
+            <p class="mode-note" style="margin-bottom:12px;">Samples annual returns from a normal distribution. Start with a preset or adjust the parameters below.</p>
+            <div style="display:flex;gap:6px;margin-bottom:10px;">
+              <button class="toggle-btn active" id="mc-preset-equity" style="border-radius:10px;flex:1;font-size:11px;" onclick="applyMCPreset('equity')">Equity</button>
+              <button class="toggle-btn" id="mc-preset-balanced" style="border-radius:10px;flex:1;font-size:11px;" onclick="applyMCPreset('balanced')">Balanced</button>
+              <button class="toggle-btn" id="mc-preset-aggressive" style="border-radius:10px;flex:1;font-size:11px;" onclick="applyMCPreset('aggressive')">Aggressive</button>
+            </div>
+            <div class="control-row">
+              <label>Expected return (%/yr)</label>
+              <input type="range" min="-20" max="30" step="0.5" value="10" id="mc-mean-return"
+                oninput="document.getElementById('mcMeanVal').textContent=parseFloat(this.value).toFixed(1)+'%';onMCParamChange()" />
+              <span class="range-val" id="mcMeanVal">10.0%</span>
+            </div>
+            <div class="control-row">
+              <label>Annual volatility (%)</label>
+              <input type="range" min="0" max="50" step="0.5" value="17" id="mc-volatility"
+                oninput="document.getElementById('mcVolatilityVal').textContent=parseFloat(this.value).toFixed(1)+'%';onMCParamChange()" />
+              <span class="range-val" id="mcVolatilityVal">17.0%</span>
+            </div>
           </div>
         </section>
 
@@ -701,13 +726,13 @@
         <section class="control-section" id="rand-panel" style="display:none;" data-section="analysis">
           <div class="section-header">
             <div>
-              <div class="section-title">Random Analysis</div>
+              <div class="section-title" id="analysis-section-title">Historical Reshuffle</div>
             </div>
-            <button class="section-help" type="button" aria-label="Random analysis help" data-tooltip="Run Analysis performs 500 independent reshuffles of the same 14 historical returns and visualizes the distribution of outcomes. The safe-spend finder searches for the highest monthly spend that still meets your selected survival target.">?</button>
+            <button class="section-help" id="analysis-help-btn" type="button" aria-label="Analysis help" data-tooltip="Run Analysis performs 500 independent reshuffles of the same 14 historical returns and visualizes the distribution of outcomes. The safe-spend finder searches for the highest monthly spend that still meets your selected survival target.">?</button>
           </div>
           <div class="analysis-actions" style="margin-bottom:0;">
             <div class="analysis-action-row">
-              <button class="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
+              <button class="reshuffle-btn" id="reshuffle-btn" onclick="reshuffle()">Reshuffle ↺</button>
               <button class="run-analysis-btn" onclick="runMonteCarloAnalysis()">Run Analysis ▶</button>
             </div>
           </div>
@@ -747,8 +772,8 @@
           <div class="mc-section-header">
             <span class="mc-section-title">500-Run Distribution</span>
             <div class="toggle-group">
-              <button class="toggle-btn active" id="scatter-tab-outcome"  onclick="switchScatterTab('outcome')">Outcome</button>
-              <button class="toggle-btn"        id="scatter-tab-timeline" onclick="switchScatterTab('timeline')">Timeline</button>
+              <button class="toggle-btn active" id="scatter-tab-outcome"  onclick="switchScatterTab('histogram')">Histogram</button>
+              <button class="toggle-btn"        id="scatter-tab-timeline" onclick="switchScatterTab('survival')">Survival</button>
             </div>
           </div>
           <div class="mc-cards-wrap">
@@ -801,7 +826,7 @@ let shuffledSequence = [];
 // MC analysis state
 let mcRuns = [];
 let mcAnalysisActive = false;
-let activeScatterTab = 'outcome';
+let activeScatterTab = 'histogram';
 let viewingRunIdx = null;
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
@@ -821,6 +846,47 @@ function buildFullRandomSequence() {
     seq.push(...shuffleArray(ANNUAL_RETURNS.map((r, i) => ({ r, origIdx: i + 1 }))));
   }
   return seq.slice(0, MAX_YEARS);
+}
+
+function sampleNormalAnnualReturns(mean, volatility, years) {
+  const results = [];
+  for (let i = 0; i < years; i++) {
+    let u, v, s;
+    do {
+      u = Math.random() * 2 - 1;
+      v = Math.random() * 2 - 1;
+      s = u * u + v * v;
+    } while (s >= 1 || s === 0);
+    const z = u * Math.sqrt(-2 * Math.log(s) / s);
+    results.push(Math.max(-0.999, mean + volatility * z));
+  }
+  return results;
+}
+
+function buildFullMCSequence() {
+  const mean = parseFloat(document.getElementById('mc-mean-return').value) / 100;
+  const vol  = parseFloat(document.getElementById('mc-volatility').value)  / 100;
+  return sampleNormalAnnualReturns(mean, vol, MAX_YEARS).map(r => ({ r, origIdx: null }));
+}
+
+function applyMCPreset(preset) {
+  ['equity','balanced','aggressive'].forEach(id =>
+    document.getElementById('mc-preset-' + id).classList.toggle('active', id === preset)
+  );
+  const meanInput = document.getElementById('mc-mean-return');
+  const volInput  = document.getElementById('mc-volatility');
+  const presets = { equity: [10, 17], balanced: [8, 12], aggressive: [19, 21] };
+  const [mean, vol] = presets[preset];
+  meanInput.value = mean; volInput.value = vol;
+  document.getElementById('mcMeanVal').textContent = mean.toFixed(1) + '%';
+  document.getElementById('mcVolatilityVal').textContent = vol.toFixed(1) + '%';
+  onMCParamChange();
+}
+
+function onMCParamChange() {
+  if (mcAnalysisActive) resetAnalysis();
+  shuffledSequence = buildFullMCSequence();
+  calculate();
 }
 
 function percentile(arr, p) {
@@ -856,7 +922,7 @@ function onGuardrailsToggle() {
 }
 
 function reshuffle() {
-  shuffledSequence = buildFullRandomSequence();
+  shuffledSequence = mode === 'mc' ? buildFullMCSequence() : buildFullRandomSequence();
   resetAnalysis();
   calculate();
 }
@@ -872,6 +938,9 @@ function findSafeWithdrawal() {
   const guardrailsOn = document.getElementById('guardrails-toggle').checked;
   const target       = parseFloat(document.getElementById('finder-target').value) / 100;
   if (capital <= 0 && cashReserve <= 0) return;
+  const isMC   = mode === 'mc';
+  const mcMean = isMC ? parseFloat(document.getElementById('mc-mean-return').value) / 100 : 0;
+  const mcVol  = isMC ? parseFloat(document.getElementById('mc-volatility').value)  / 100 : 0;
 
   const resultEl = document.getElementById('finder-result');
   resultEl.style.display = '';
@@ -883,7 +952,9 @@ function findSafeWithdrawal() {
     function survivalRate(spend) {
       let survived = 0;
       for (let i = 0; i < RUNS; i++) {
-        const seq = buildFullRandomSequence();
+        const seq = isMC
+          ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS).map(r => ({ r, origIdx: null }))
+          : buildFullRandomSequence();
         const r = simulateSequence(capital, spend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn, cashReserve, cashRate);
         if (!r.depleted) survived++;
       }
@@ -910,10 +981,11 @@ function findSafeWithdrawal() {
       else break;
     }
 
-    // Verification run for displayed rate
     let verifiedSurvived = 0;
     for (let i = 0; i < RUNS; i++) {
-      const seq = buildFullRandomSequence();
+      const seq = isMC
+        ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS).map(r => ({ r, origIdx: null }))
+        : buildFullRandomSequence();
       const r = simulateSequence(capital, bestSpend, ssAmount, ssDelay, seq, null, inflationRate, guardrailsOn, cashReserve, cashRate);
       if (!r.depleted) verifiedSurvived++;
     }
@@ -973,14 +1045,25 @@ function updateResultsLayout() {
 
 function setMode(m) {
   mode = m;
-  ['fixed','seq','rand'].forEach(id => document.getElementById('btn-'+id).classList.toggle('active', m === id));
-  document.getElementById('fixed-panel').style.display  = m === 'fixed' ? '' : 'none';
-  document.getElementById('seq-panel').style.display    = m === 'seq'   ? '' : 'none';
-  document.getElementById('rand-panel').style.display   = m === 'rand'  ? '' : 'none';
-  document.getElementById('th-seq').style.display       = (m === 'seq' || m === 'rand') ? '' : 'none';
+  ['fixed','seq','rand','mc'].forEach(id => document.getElementById('btn-'+id).classList.toggle('active', m === id));
+  document.getElementById('fixed-panel').style.display      = m === 'fixed' ? '' : 'none';
+  document.getElementById('seq-panel').style.display        = m === 'seq'   ? '' : 'none';
+  document.getElementById('mc-inputs-panel').style.display  = m === 'mc'    ? '' : 'none';
+  document.getElementById('rand-panel').style.display       = (m === 'rand' || m === 'mc') ? '' : 'none';
+  document.getElementById('th-seq').style.display           = (m === 'seq' || m === 'rand') ? '' : 'none';
+  if (m === 'rand' || m === 'mc') {
+    document.getElementById('analysis-section-title').textContent = m === 'mc' ? 'Monte Carlo' : 'Historical Reshuffle';
+    document.getElementById('reshuffle-btn').textContent = m === 'mc' ? 'Sample New Path ↺' : 'Reshuffle ↺';
+    document.getElementById('analysis-help-btn').setAttribute('data-tooltip',
+      m === 'mc'
+        ? 'Run Analysis performs 500 independent Monte Carlo samplings from your distribution and visualizes the outcome spread. The safe-spend finder searches for the highest monthly spend that still meets your selected survival target.'
+        : 'Run Analysis performs 500 independent reshuffles of the same 14 historical returns and visualizes the distribution of outcomes. The safe-spend finder searches for the highest monthly spend that still meets your selected survival target.'
+    );
+  }
   updateResultsLayout();
   resetAnalysis();
-  if (m === 'rand' && shuffledSequence.length === 0) reshuffle();
+  shuffledSequence = [];
+  if (m === 'rand' || m === 'mc') reshuffle();
   else calculate();
 }
 
@@ -1142,9 +1225,15 @@ function runMonteCarloAnalysis() {
   const guardrailsOn  = document.getElementById('guardrails-toggle').checked;
   if (capital + cashReserve <= 0 || monthly <= 0) return;
 
+  const isMC   = mode === 'mc';
+  const mcMean = isMC ? parseFloat(document.getElementById('mc-mean-return').value) / 100 : 0;
+  const mcVol  = isMC ? parseFloat(document.getElementById('mc-volatility').value)  / 100 : 0;
+
   mcRuns = [];
   for (let i = 0; i < 500; i++) {
-    const seq = buildFullRandomSequence();
+    const seq = isMC
+      ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS).map(r => ({ r, origIdx: null }))
+      : buildFullRandomSequence();
     const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate, guardrailsOn, cashReserve, cashRate);
     mcRuns.push({ seq, ...result });
   }
@@ -1169,7 +1258,9 @@ function runMonteCarloAnalysis() {
     ${survived.length > 0 ? `<div class="card"><div class="card-label">Best outcome</div><div class="card-value green">$${fmt0(bestFinal)}</div></div>` : ''}
   `;
 
-  document.getElementById('mc-analysis').style.display = '';
+  const mcAnalysisEl = document.getElementById('mc-analysis');
+  mcAnalysisEl.style.display = '';
+  mcAnalysisEl.classList.remove('run-view');
   drawFanChart();
   drawScatter(activeScatterTab);
 }
@@ -1178,11 +1269,73 @@ function loadRun(runIdx) {
   viewingRunIdx = runIdx;
   mcAnalysisActive = false;
   shuffledSequence = mcRuns[runIdx].seq;
-  calculate();
-  const run = mcRuns[runIdx];
-  const note = document.getElementById('mc-viewing-note');
-  note.style.display = '';
-  note.textContent = `Viewing run #${runIdx + 1} — ${run.depleted ? `depleted Yr ${run.depletedYear}` : `survived · final $${fmt0(run.finalBal)}`} · Click Reshuffle ↺ or Run Analysis ▶ to reset`;
+
+  const run           = mcRuns[runIdx];
+  const inflationOn   = document.getElementById('inflation-toggle').checked;
+  const inflationRate = inflationOn ? parseFloat(document.getElementById('inflation-rate').value) / 100 : 0;
+  const guardrailsOn  = document.getElementById('guardrails-toggle').checked;
+  const ssAmount      = parseFloat(document.getElementById('ss-amount').value)    || 0;
+  const capital       = parseFloat(document.getElementById('capital').value)       || 0;
+  const cashReserve   = parseFloat(document.getElementById('cash-reserve').value)  || 0;
+  const initialTotal  = capital + cashReserve;
+
+  // Stat cards from stored run data
+  const cards = document.getElementById('cards');
+  const boosts = guardrailsOn ? run.yearRows.filter(r => r.guardrailEvent === 'boost').length : 0;
+  const cuts   = guardrailsOn ? run.yearRows.filter(r => r.guardrailEvent === 'cut').length   : 0;
+  const guardrailCard = guardrailsOn
+    ? `<div class="card"><div class="card-label">Guardrail events</div><div class="card-value">${boosts} boost${boosts!==1?'s':''} / ${cuts} cut${cuts!==1?'s':''}</div></div>`
+    : '';
+  if (run.depleted) {
+    cards.innerHTML = `
+      <div class="card"><div class="card-label">Depleted at</div><div class="card-value red">Yr ${run.depletedYear}</div></div>
+      <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(run.totalInterest)}</div></div>
+      ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(run.totalSS)}</div></div>` : ''}
+      ${guardrailCard}
+    `;
+  } else {
+    const gainPct = ((run.finalBal / initialTotal) - 1) * 100;
+    const realValCard = inflationRate > 0
+      ? `<div class="card"><div class="card-label">Real value at yr ${MAX_YEARS}</div><div class="card-value purple">$${fmt0(run.finalBal / Math.pow(1 + inflationRate, MAX_YEARS))} <span style="font-size:11px;font-weight:400;color:#6b7280">today's $</span></div></div>`
+      : '';
+    cards.innerHTML = `
+      <div class="card"><div class="card-label">Balance at yr ${MAX_YEARS}</div><div class="card-value green">$${fmt0(run.finalBal)}</div></div>
+      <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(run.totalInterest)}</div></div>
+      <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
+      ${realValCard}
+      ${ssAmount > 0 ? `<div class="card"><div class="card-label">SS received</div><div class="card-value">$${fmt0(run.totalSS)}</div></div>` : ''}
+      ${guardrailCard}
+    `;
+  }
+
+  // Percentile rank among all 500 runs
+  const worseThan  = mcRuns.filter(r => r.finalBal < run.finalBal).length;
+  const percentile = Math.max(1, Math.round((worseThan / mcRuns.length) * 100));
+  const pctColor   = percentile <= 25 ? 'red' : percentile >= 75 ? 'green' : 'blue';
+  cards.innerHTML += `<div class="card"><div class="card-label">Distribution rank</div><div class="card-value ${pctColor}">${percentile}th percentile</div><div style="font-size:10px;color:#6b7280;margin-top:2px;">better than ${percentile}% of runs</div></div>`;
+
+  // Compact the distribution panel so the chart stays visible and clickable
+  const mcEl = document.getElementById('mc-analysis');
+  mcEl.style.display = '';
+  mcEl.classList.add('run-view');
+  if (scatterInstance) drawScatter(activeScatterTab);
+  buildYearTable(run.yearRows, ssAmount > 0, inflationRate, guardrailsOn);
+
+  // Label the table to show which run is being inspected
+  const resetHint = mode === 'mc' ? 'Sample New Path ↺' : 'Reshuffle ↺';
+  const runLabel  = run.depleted ? `depleted Yr ${run.depletedYear}` : `survived · $${fmt0(run.finalBal)}`;
+  document.getElementById('yr-table-title').innerHTML =
+    `Yearly breakdown <span style="font-size:11px;font-weight:400;color:#6b7280;">· Run #${runIdx + 1} — ${runLabel} · Click ${resetHint} or Run Analysis ▶ to return</span>`;
+
+  // Chart from stored balData
+  const labels = ['Start'], tooltipLabels = ['Start'];
+  for (let y = 0; y < MAX_YEARS; y++) {
+    const r = run.yearRows[y];
+    const seqLabel = r && r.seqYr !== null ? ` [S${r.seqYr}]` : '';
+    labels.push(`Yr ${y + 1}`);
+    tooltipLabels.push(`Yr ${y + 1}${seqLabel}`);
+  }
+  drawChart(labels, run.balData, inflationRate, tooltipLabels);
 }
 
 // ─── Fan chart ───────────────────────────────────────────────────────────────
@@ -1207,19 +1360,19 @@ function drawFanChart() {
       labels,
       datasets: [
         {
-          label: '10th pct', data: p10Data,
-          borderColor: 'rgba(167,139,250,0.4)', backgroundColor: 'rgba(167,139,250,0.13)',
-          fill: '+1', borderDash: [4,4], borderWidth: 1, pointRadius: 0, tension: 0.3
+          label: '10th %ile', data: p10Data,
+          borderColor: 'rgba(248,113,113,0.75)', backgroundColor: 'rgba(148,184,226,0.09)',
+          fill: '+1', borderDash: [4,3], borderWidth: 1.5, pointRadius: 0, tension: 0.3
         },
         {
-          label: '90th pct', data: p90Data,
-          borderColor: 'rgba(167,139,250,0.4)', backgroundColor: 'transparent',
-          fill: false, borderDash: [4,4], borderWidth: 1, pointRadius: 0, tension: 0.3
+          label: '90th %ile', data: p90Data,
+          borderColor: 'rgba(74,222,128,0.75)', backgroundColor: 'transparent',
+          fill: false, borderDash: [6,3], borderWidth: 1.5, pointRadius: 0, tension: 0.3
         },
         {
           label: 'Median', data: p50Data,
-          borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.06)',
-          fill: false, borderWidth: 2, pointRadius: 2, tension: 0.3
+          borderColor: '#a78bfa', backgroundColor: 'transparent',
+          fill: false, borderWidth: 2.5, pointRadius: 2, tension: 0.3
         }
       ]
     },
@@ -1251,109 +1404,190 @@ function drawFanChart() {
 
 function switchScatterTab(tab) {
   activeScatterTab = tab;
-  document.getElementById('scatter-tab-outcome').classList.toggle('active',  tab === 'outcome');
-  document.getElementById('scatter-tab-timeline').classList.toggle('active', tab === 'timeline');
+  document.getElementById('scatter-tab-outcome').classList.toggle('active',  tab === 'histogram');
+  document.getElementById('scatter-tab-timeline').classList.toggle('active', tab === 'survival');
   if (mcRuns.length > 0) drawScatter(tab);
 }
 
 function drawScatter(tab) {
   if (scatterInstance) { scatterInstance.destroy(); scatterInstance = null; }
 
-  const survivedPts = [], depletedPts = [];
+  const canvas = document.getElementById('scatterChart');
+  const commonTooltip = {
+    backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
+    titleColor: '#d1d5db', bodyColor: '#fff',
+  };
+  const commonLegend = { display: true, position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 10 } };
 
-  if (tab === 'outcome') {
+  if (tab === 'histogram') {
+    const allBals   = mcRuns.map(r => r.finalBal);
+    const maxBal    = Math.max(...allBals);
+    const BIN_COUNT = 20;
+    const binWidth  = maxBal / BIN_COUNT || 1;
+
+    const survivedCounts = Array(BIN_COUNT).fill(0);
+    const depletedCounts = Array(BIN_COUNT).fill(0);
+    const binRuns        = Array.from({ length: BIN_COUNT }, () => []);
+
     mcRuns.forEach((run, i) => {
-      const pt = { x: run.finalBal, y: Math.round(run.totalInterest), runIdx: i };
-      (run.depleted ? depletedPts : survivedPts).push(pt);
+      const idx = Math.min(Math.floor(run.finalBal / binWidth), BIN_COUNT - 1);
+      (run.depleted ? depletedCounts : survivedCounts)[idx]++;
+      binRuns[idx].push(i);
     });
-  } else {
-    // Sort by final balance ascending; x = rank, y = depletion year (MAX_YEARS if survived)
-    const sorted = mcRuns.map((r, i) => ({ ...r, origIdx: i })).sort((a, b) => a.finalBal - b.finalBal);
-    sorted.forEach((run, rank) => {
-      const yr = run.depleted ? (run.depletedYear || 0) : MAX_YEARS;
-      const pt = { x: rank + 1, y: yr, runIdx: run.origIdx };
-      (run.depleted ? depletedPts : survivedPts).push(pt);
-    });
-  }
 
-  const isOutcome  = tab === 'outcome';
-  const xAxisLabel = isOutcome ? 'Final Balance ($)' : 'Run rank (sorted by final balance)';
-  const yAxisLabel = isOutcome ? 'Total Interest Earned ($)' : `Year depleted  (${MAX_YEARS} = survived)`;
+    const selectedBin = viewingRunIdx !== null
+      ? Math.min(Math.floor(mcRuns[viewingRunIdx].finalBal / binWidth), BIN_COUNT - 1)
+      : null;
 
-  scatterInstance = new Chart(document.getElementById('scatterChart'), {
-    type: 'scatter',
-    data: {
-      datasets: [
-        { label: 'Survived', data: survivedPts, backgroundColor: 'rgba(74,222,128,0.5)',  pointRadius: 4, pointHoverRadius: 6 },
-        { label: 'Depleted', data: depletedPts, backgroundColor: 'rgba(248,113,113,0.6)', pointRadius: 4, pointHoverRadius: 6 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      layout: {
-        padding: { top: 6, right: 8, bottom: 10, left: 4 }
+    const labels = Array.from({ length: BIN_COUNT }, (_, i) =>
+      '$' + (i * binWidth >= 1000 ? ((i * binWidth) / 1000).toFixed(0) + 'k' : fmt0(i * binWidth)));
+
+    const survivedColors = survivedCounts.map((_, i) =>
+      i === selectedBin ? '#fbbf24' : 'rgba(74,222,128,0.55)');
+    const depletedColors = depletedCounts.map((_, i) =>
+      i === selectedBin ? '#fbbf24' : 'rgba(248,113,113,0.65)');
+
+    scatterInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Survived', data: survivedCounts, backgroundColor: survivedColors, stack: 'runs' },
+          { label: 'Depleted', data: depletedCounts, backgroundColor: depletedColors, stack: 'runs' },
+        ]
       },
-      onClick: (evt, elements) => {
-        if (!elements.length) return;
-        const el  = elements[0];
-        const pts = el.datasetIndex === 0 ? survivedPts : depletedPts;
-        const pt  = pts[el.index];
-        if (pt !== undefined) loadRun(pt.runIdx);
-      },
-      plugins: {
-        legend: { display: true, position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 10 } },
-        tooltip: {
-          backgroundColor: '#111827', borderColor: '#374151', borderWidth: 1,
-          titleColor: '#d1d5db', bodyColor: '#fff',
-          callbacks: {
-            label: c => {
-              const pt  = c.raw;
-              const run = mcRuns[pt.runIdx];
-              if (isOutcome) {
-                return [
-                  ` Final bal: $${fmt0(pt.x)}`,
-                  ` Interest:  $${fmt0(pt.y)}`,
-                  run.depleted ? ` Depleted: Yr ${run.depletedYear}` : ` Survived ${MAX_YEARS} yrs`
-                ];
-              } else {
-                return [
-                  ` Rank: #${pt.x}`,
-                  run.depleted ? ` Depleted: Yr ${pt.y}` : ` Survived (Yr ${MAX_YEARS})`,
-                  ` Final bal: $${fmt0(run.finalBal)}`
-                ];
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        layout: { padding: { top: 6, right: 8, bottom: 4, left: 4 } },
+        onClick: (evt, elements) => {
+          if (!elements.length) return;
+          const binIdx = elements[0].index;
+          if (!binRuns[binIdx].length) return;
+          const mid  = (binIdx + 0.5) * binWidth;
+          const best = binRuns[binIdx].reduce((a, b) =>
+            Math.abs(mcRuns[a].finalBal - mid) < Math.abs(mcRuns[b].finalBal - mid) ? a : b);
+          loadRun(best);
+        },
+        plugins: {
+          legend: commonLegend,
+          tooltip: {
+            ...commonTooltip,
+            callbacks: {
+              title: c => {
+                const i = c[0].dataIndex;
+                const lo = i * binWidth, hi = (i + 1) * binWidth;
+                return `$${fmt0(lo)} – $${fmt0(hi)}`;
+              },
+              label: c => {
+                const i = c.dataIndex;
+                const total = survivedCounts[i] + depletedCounts[i];
+                let below = 0;
+                for (let j = 0; j < i; j++) below += survivedCounts[j] + depletedCounts[j];
+                const pct = Math.round((below / mcRuns.length) * 100);
+                return [` Runs in bin: ${total}`, ` ≥ ${pct}th percentile`];
               }
             }
           }
-        }
-      },
-      scales: {
-        x: {
-          title: { display: true, text: xAxisLabel, color: '#6b7280', font: { size: 11 } },
-          ticks: {
-            color: '#6b7280', font: { size: 10 },
-            callback: isOutcome ? v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v) : v => v
-          },
-          grid: { color: '#1f2937' }
         },
-        y: {
-          title: { display: true, text: yAxisLabel, color: '#6b7280', font: { size: 11 } },
-          ticks: {
-            color: '#6b7280', font: { size: 10 },
-            callback: isOutcome ? v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v) : v => `Yr ${v}`
+        scales: {
+          x: {
+            title: { display: true, text: 'Final Balance ($)', color: '#6b7280', font: { size: 11 } },
+            ticks: { color: '#6b7280', font: { size: 10 }, maxTicksLimit: 8 },
+            grid: { color: '#1f2937' },
+            stacked: true,
           },
-          grid: { color: '#1f2937' }
+          y: {
+            title: { display: true, text: 'Number of runs', color: '#6b7280', font: { size: 11 } },
+            ticks: { color: '#6b7280', font: { size: 10 } },
+            grid: { color: '#1f2937' },
+            stacked: true,
+          }
         }
       }
+    });
+
+  } else {
+    // Survival probability curve
+    const survivalData = Array.from({ length: MAX_YEARS + 1 }, (_, yr) => {
+      if (yr === 0) return 100;
+      const alive = mcRuns.filter(r => !r.depleted || r.depletedYear > yr).length;
+      return parseFloat(((alive / mcRuns.length) * 100).toFixed(1));
+    });
+    const labels = ['Start', ...Array.from({ length: MAX_YEARS }, (_, i) => `Yr ${i + 1}`)];
+
+    const datasets = [{
+      label: 'Survival probability',
+      data: survivalData,
+      borderColor: '#22d3ee',
+      backgroundColor: 'rgba(34,211,238,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      pointHoverBackgroundColor: '#22d3ee',
+    }];
+
+    if (viewingRunIdx !== null) {
+      const run      = mcRuns[viewingRunIdx];
+      const markerYr = run.depleted ? run.depletedYear : MAX_YEARS;
+      const markerData = Array(MAX_YEARS + 1).fill(null);
+      markerData[markerYr] = survivalData[markerYr];
+      datasets.push({
+        label: `Run #${viewingRunIdx + 1}`,
+        data: markerData,
+        backgroundColor: '#fbbf24',
+        borderColor: '#fbbf24',
+        pointRadius: markerData.map(d => d !== null ? 8 : 0),
+        pointStyle: 'triangle',
+        showLine: false,
+      });
     }
-  });
+
+    scatterInstance = new Chart(canvas, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        layout: { padding: { top: 6, right: 8, bottom: 4, left: 4 } },
+        plugins: {
+          legend: commonLegend,
+          tooltip: {
+            ...commonTooltip,
+            callbacks: {
+              label: c => {
+                if (c.datasetIndex === 0) return ` ${c.raw}% of runs still solvent`;
+                const run = mcRuns[viewingRunIdx];
+                return run.depleted
+                  ? ` Run #${viewingRunIdx + 1} depleted here`
+                  : ` Run #${viewingRunIdx + 1} survived to yr ${MAX_YEARS}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Year', color: '#6b7280', font: { size: 11 } },
+            ticks: { color: '#6b7280', font: { size: 10 }, maxTicksLimit: 10 },
+            grid: { color: '#1f2937' },
+          },
+          y: {
+            min: 0, max: 100,
+            title: { display: true, text: 'Runs still solvent (%)', color: '#6b7280', font: { size: 11 } },
+            ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v + '%' },
+            grid: { color: '#1f2937' },
+          }
+        }
+      }
+    });
+  }
 }
 
 // ─── Single-run chart ────────────────────────────────────────────────────────
 
 function drawChart(labels, balData, inflationRate = 0, tooltipLabels = labels) {
   if (chartInstance) chartInstance.destroy();
-  const color = mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
-  const bg    = mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
+  const color = mode === 'mc' ? '#fb923c' : mode === 'rand' ? '#a78bfa' : mode === 'seq' ? '#60a5fa' : '#4ade80';
+  const bg    = mode === 'mc' ? 'rgba(251,146,60,0.08)' : mode === 'rand' ? 'rgba(167,139,250,0.08)' : mode === 'seq' ? 'rgba(96,165,250,0.08)' : 'rgba(74,222,128,0.08)';
 
   chartInstance = new Chart(document.getElementById('chart'), {
     type: 'line',
