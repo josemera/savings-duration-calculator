@@ -840,6 +840,7 @@ const HISTORICAL_RETURN_YEARS = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
 const ANNUAL_RETURNS = [11.9, 32.9, 16.4, 0.3, 19.0, 26.3, -5.9, 39.8, 30.9, 34.2, -21.0, 36.1, 27.8, 28.9].map(r => r / 100);
 
 let MAX_YEARS = 30;
+const FULL_YEARS = 40; // MC always simulates to full horizon; display trims to MAX_YEARS
 let mode = 'fixed';
 let chartInstance = null;
 let scatterInstance = null;
@@ -862,12 +863,12 @@ function shuffleArray(arr) {
   return a;
 }
 
-function buildFullRandomSequence() {
+function buildFullRandomSequence(years = MAX_YEARS) {
   const seq = [];
-  while (seq.length < MAX_YEARS) {
+  while (seq.length < years) {
     seq.push(...shuffleArray(ANNUAL_RETURNS.map((r, i) => ({ r, origIdx: i + 1 }))));
   }
-  return seq.slice(0, MAX_YEARS);
+  return seq.slice(0, years);
 }
 
 function sampleNormalAnnualReturns(mean, volatility, years, meanRevCoeff = 0, maxLoss = 0.999, maxGain = 9.999) {
@@ -1061,7 +1062,17 @@ function setHorizon(n) {
   [10, 15, 20, 25, 30, 40].forEach(y =>
     document.getElementById('btn-h' + y).classList.toggle('active', y === n)
   );
-  resetAnalysis();
+  if (mcRuns.length > 0) {
+    renderMCCards();
+    if (viewingRunIdx !== null) {
+      loadRun(viewingRunIdx);
+    } else {
+      drawFanChart();
+      drawScatter(activeScatterTab);
+    }
+  } else {
+    resetAnalysis();
+  }
   calculate();
 }
 
@@ -1101,7 +1112,7 @@ function setMode(m) {
 
 // ─── Core simulation ─────────────────────────────────────────────────────────
 
-function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate = 0, guardrailsOn = false, cashReserve = 0, cashRate = 0) {
+function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate = 0, guardrailsOn = false, cashReserve = 0, cashRate = 0, years = MAX_YEARS) {
   const initialTotal = capital + cashReserve;
   const balData = [initialTotal];
   const yearRows = [];
@@ -1113,7 +1124,7 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, i
   let guardrailSpend = guardrailsOn ? monthly : null;
   const cashMonthlyRate = Math.pow(1 + cashRate, 1/12) - 1;
 
-  for (let y = 0; y < MAX_YEARS; y++) {
+  for (let y = 0; y < years; y++) {
     if (balance <= 0 && cashBalance <= 0) { depleted = true; depletedYear = y; break; }
 
     let annualReturn, seqYr;
@@ -1165,12 +1176,11 @@ function simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, i
     balData.push(Math.round(totalBalance));
   }
 
-  // Pad to MAX_YEARS + 1 so all runs share the same length (needed for fan chart)
-  while (balData.length < MAX_YEARS + 1) balData.push(0);
+  while (balData.length < years + 1) balData.push(0);
 
   const totalInterest = yearRows.reduce((s, r) => s + r.yearInterest, 0);
   const totalSS       = yearRows.reduce((s, r) => s + r.yearSS, 0);
-  const finalBal      = balData[MAX_YEARS];
+  const finalBal      = balData[years];
 
   return { balData, yearRows, depleted, depletedYear, totalInterest, totalSS, finalBal };
 }
@@ -1267,9 +1277,9 @@ function runMonteCarloAnalysis() {
   mcRuns = [];
   for (let i = 0; i < 500; i++) {
     const seq = isMC
-      ? sampleNormalAnnualReturns(mcMean, mcVol, MAX_YEARS, mcMeanRev, mcMaxLoss, mcMaxGain).map(r => ({ r, origIdx: null }))
-      : buildFullRandomSequence();
-    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate, guardrailsOn, cashReserve, cashRate);
+      ? sampleNormalAnnualReturns(mcMean, mcVol, FULL_YEARS, mcMeanRev, mcMaxLoss, mcMaxGain).map(r => ({ r, origIdx: null }))
+      : buildFullRandomSequence(FULL_YEARS);
+    const result = simulateSequence(capital, monthly, ssAmount, ssDelay, seq, fixedRate, inflationRate, guardrailsOn, cashReserve, cashRate, FULL_YEARS);
     mcRuns.push({ seq, ...result });
   }
 
@@ -1277,14 +1287,22 @@ function runMonteCarloAnalysis() {
   viewingRunIdx = null;
   document.getElementById('mc-viewing-note').style.display = 'none';
 
-  // Summary cards
-  const survived = mcRuns.filter(r => !r.depleted);
-  const depleted = mcRuns.filter(r =>  r.depleted);
-  const survivedPct  = (survived.length / 500 * 100).toFixed(0);
-  const medianFinal  = percentile(mcRuns.map(r => r.finalBal), 50);
-  const worstDepletion = depleted.length > 0 ? Math.min(...depleted.map(r => r.depletedYear)) : null;
-  const bestFinal    = survived.length > 0 ? Math.max(...survived.map(r => r.finalBal)) : 0;
+  renderMCCards();
 
+  const mcAnalysisEl = document.getElementById('mc-analysis');
+  mcAnalysisEl.style.display = '';
+  mcAnalysisEl.classList.remove('run-view');
+  drawFanChart();
+  drawScatter(activeScatterTab);
+}
+
+function renderMCCards() {
+  const survived = mcRuns.filter(r => !r.depleted || r.depletedYear > MAX_YEARS);
+  const depletedRuns = mcRuns.filter(r => r.depleted && r.depletedYear <= MAX_YEARS);
+  const survivedPct    = (survived.length / mcRuns.length * 100).toFixed(0);
+  const medianFinal    = percentile(mcRuns.map(r => r.balData[MAX_YEARS]), 50);
+  const worstDepletion = depletedRuns.length > 0 ? Math.min(...depletedRuns.map(r => r.depletedYear)) : null;
+  const bestFinal      = survived.length > 0 ? Math.max(...survived.map(r => r.balData[MAX_YEARS])) : 0;
   const pctColor = parseFloat(survivedPct) >= 80 ? 'green' : parseFloat(survivedPct) >= 50 ? 'blue' : 'red';
   document.getElementById('mc-cards').innerHTML = `
     <div class="card"><div class="card-label">Survived ${MAX_YEARS} yrs</div><div class="card-value ${pctColor}">${survivedPct}%</div></div>
@@ -1292,12 +1310,6 @@ function runMonteCarloAnalysis() {
     ${worstDepletion !== null ? `<div class="card"><div class="card-label">Earliest depletion</div><div class="card-value red">Yr ${worstDepletion}</div></div>` : ''}
     ${survived.length > 0 ? `<div class="card"><div class="card-label">Best outcome</div><div class="card-value green">$${fmt0(bestFinal)}</div></div>` : ''}
   `;
-
-  const mcAnalysisEl = document.getElementById('mc-analysis');
-  mcAnalysisEl.style.display = '';
-  mcAnalysisEl.classList.remove('run-view');
-  drawFanChart();
-  drawScatter(activeScatterTab);
 }
 
 function loadRun(runIdx) {
@@ -1314,14 +1326,18 @@ function loadRun(runIdx) {
   const cashReserve   = parseFloat(document.getElementById('cash-reserve').value)  || 0;
   const initialTotal  = capital + cashReserve;
 
-  // Stat cards from stored run data
+  // Horizon-aware: a run "depleted within horizon" only if depletion year <= MAX_YEARS
+  const depletedWithinHorizon = run.depleted && run.depletedYear <= MAX_YEARS;
+  const horizonBal = run.balData[MAX_YEARS];
+
   const cards = document.getElementById('cards');
-  const boosts = guardrailsOn ? run.yearRows.filter(r => r.guardrailEvent === 'boost').length : 0;
-  const cuts   = guardrailsOn ? run.yearRows.filter(r => r.guardrailEvent === 'cut').length   : 0;
+  const visibleRows = run.yearRows.slice(0, MAX_YEARS);
+  const boosts = guardrailsOn ? visibleRows.filter(r => r.guardrailEvent === 'boost').length : 0;
+  const cuts   = guardrailsOn ? visibleRows.filter(r => r.guardrailEvent === 'cut').length   : 0;
   const guardrailCard = guardrailsOn
     ? `<div class="card"><div class="card-label">Guardrail events</div><div class="card-value">${boosts} boost${boosts!==1?'s':''} / ${cuts} cut${cuts!==1?'s':''}</div></div>`
     : '';
-  if (run.depleted) {
+  if (depletedWithinHorizon) {
     cards.innerHTML = `
       <div class="card"><div class="card-label">Depleted at</div><div class="card-value red">Yr ${run.depletedYear}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(run.totalInterest)}</div></div>
@@ -1329,12 +1345,12 @@ function loadRun(runIdx) {
       ${guardrailCard}
     `;
   } else {
-    const gainPct = ((run.finalBal / initialTotal) - 1) * 100;
+    const gainPct = ((horizonBal / initialTotal) - 1) * 100;
     const realValCard = inflationRate > 0
-      ? `<div class="card"><div class="card-label">Real value at yr ${MAX_YEARS}</div><div class="card-value purple">$${fmt0(run.finalBal / Math.pow(1 + inflationRate, MAX_YEARS))} <span style="font-size:11px;font-weight:400;color:#6b7280">today's $</span></div></div>`
+      ? `<div class="card"><div class="card-label">Real value at yr ${MAX_YEARS}</div><div class="card-value purple">$${fmt0(horizonBal / Math.pow(1 + inflationRate, MAX_YEARS))} <span style="font-size:11px;font-weight:400;color:#6b7280">today's $</span></div></div>`
       : '';
     cards.innerHTML = `
-      <div class="card"><div class="card-label">Balance at yr ${MAX_YEARS}</div><div class="card-value green">$${fmt0(run.finalBal)}</div></div>
+      <div class="card"><div class="card-label">Balance at yr ${MAX_YEARS}</div><div class="card-value green">$${fmt0(horizonBal)}</div></div>
       <div class="card"><div class="card-label">Interest earned</div><div class="card-value blue">$${fmt0(run.totalInterest)}</div></div>
       <div class="card"><div class="card-label">Total gain</div><div class="card-value ${gainPct>=0?'green':'red'}">${gainPct>=0?'+':''}${gainPct.toFixed(0)}%</div></div>
       ${realValCard}
@@ -1343,8 +1359,8 @@ function loadRun(runIdx) {
     `;
   }
 
-  // Percentile rank among all 500 runs
-  const worseThan  = mcRuns.filter(r => r.finalBal < run.finalBal).length;
+  // Percentile rank — compare at current horizon balance
+  const worseThan  = mcRuns.filter(r => r.balData[MAX_YEARS] < horizonBal).length;
   const percentile = Math.max(1, Math.round((worseThan / mcRuns.length) * 100));
   const pctColor   = percentile <= 25 ? 'red' : percentile >= 75 ? 'green' : 'blue';
   cards.innerHTML += `<div class="card"><div class="card-label">Distribution rank</div><div class="card-value ${pctColor}">${percentile}th percentile</div><div style="font-size:10px;color:#6b7280;margin-top:2px;">better than ${percentile}% of runs</div></div>`;
@@ -1354,15 +1370,15 @@ function loadRun(runIdx) {
   mcEl.style.display = '';
   mcEl.classList.add('run-view');
   if (scatterInstance) drawScatter(activeScatterTab);
-  buildYearTable(run.yearRows, ssAmount > 0, inflationRate, guardrailsOn);
+  buildYearTable(visibleRows, ssAmount > 0, inflationRate, guardrailsOn);
 
   // Label the table to show which run is being inspected
   const resetHint = mode === 'mc' ? 'Sample New Path ↺' : 'Reshuffle ↺';
-  const runLabel  = run.depleted ? `depleted Yr ${run.depletedYear}` : `survived · $${fmt0(run.finalBal)}`;
+  const runLabel  = depletedWithinHorizon ? `depleted Yr ${run.depletedYear}` : `survived · $${fmt0(horizonBal)}`;
 
   const depletedSorted = mcRuns
     .map((r, i) => ({ runIdx: i, depletedYear: r.depletedYear, depleted: r.depleted }))
-    .filter(r => r.depleted)
+    .filter(r => r.depleted && r.depletedYear <= MAX_YEARS)
     .sort((a, b) => a.depletedYear - b.depletedYear || a.runIdx - b.runIdx);
   const depPos = run.depleted ? depletedSorted.findIndex(r => r.runIdx === runIdx) : -1;
   const prevDep = depPos > 0 ? depletedSorted[depPos - 1] : null;
@@ -1375,7 +1391,7 @@ function loadRun(runIdx) {
   document.getElementById('yr-table-title').innerHTML =
     `Yearly breakdown <span style="font-size:11px;font-weight:400;color:#6b7280;">· Run #${runIdx + 1} — ${runLabel}${navHtml} · Click ${resetHint} or Run Analysis ▶ to return</span>`;
 
-  // Chart from stored balData
+  // Chart from stored balData — trimmed to current horizon
   const labels = ['Start'], tooltipLabels = ['Start'];
   for (let y = 0; y < MAX_YEARS; y++) {
     const r = run.yearRows[y];
@@ -1383,7 +1399,7 @@ function loadRun(runIdx) {
     labels.push(`Yr ${y + 1}`);
     tooltipLabels.push(`Yr ${y + 1}${seqLabel}`);
   }
-  drawChart(labels, run.balData, inflationRate, tooltipLabels);
+  drawChart(labels, run.balData.slice(0, MAX_YEARS + 1), inflationRate, tooltipLabels);
 }
 
 // ─── Fan chart ───────────────────────────────────────────────────────────────
@@ -1469,7 +1485,7 @@ function drawScatter(tab) {
   const commonLegend = { display: true, position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 10 } };
 
   if (tab === 'histogram') {
-    const allBals   = mcRuns.map(r => r.finalBal);
+    const allBals   = mcRuns.map(r => r.balData[MAX_YEARS]);
     const maxBal    = Math.max(...allBals);
     const BIN_COUNT = 20;
     const binWidth  = maxBal / BIN_COUNT || 1;
@@ -1479,13 +1495,14 @@ function drawScatter(tab) {
     const binRuns        = Array.from({ length: BIN_COUNT }, () => []);
 
     mcRuns.forEach((run, i) => {
-      const idx = Math.min(Math.floor(run.finalBal / binWidth), BIN_COUNT - 1);
-      (run.depleted ? depletedCounts : survivedCounts)[idx]++;
+      const bal = run.balData[MAX_YEARS];
+      const idx = Math.min(Math.floor(bal / binWidth), BIN_COUNT - 1);
+      ((run.depleted && run.depletedYear <= MAX_YEARS) ? depletedCounts : survivedCounts)[idx]++;
       binRuns[idx].push(i);
     });
 
     const selectedBin = viewingRunIdx !== null
-      ? Math.min(Math.floor(mcRuns[viewingRunIdx].finalBal / binWidth), BIN_COUNT - 1)
+      ? Math.min(Math.floor(mcRuns[viewingRunIdx].balData[MAX_YEARS] / binWidth), BIN_COUNT - 1)
       : null;
 
     const labels = Array.from({ length: BIN_COUNT }, (_, i) =>
@@ -1514,7 +1531,7 @@ function drawScatter(tab) {
           if (!binRuns[binIdx].length) return;
           const mid  = (binIdx + 0.5) * binWidth;
           const best = binRuns[binIdx].reduce((a, b) =>
-            Math.abs(mcRuns[a].finalBal - mid) < Math.abs(mcRuns[b].finalBal - mid) ? a : b);
+            Math.abs(mcRuns[a].balData[MAX_YEARS] - mid) < Math.abs(mcRuns[b].balData[MAX_YEARS] - mid) ? a : b);
           loadRun(best);
         },
         plugins: {
@@ -1578,7 +1595,7 @@ function drawScatter(tab) {
 
     if (viewingRunIdx !== null) {
       const run      = mcRuns[viewingRunIdx];
-      const markerYr = run.depleted ? run.depletedYear : MAX_YEARS;
+      const markerYr = (run.depleted && run.depletedYear <= MAX_YEARS) ? run.depletedYear : MAX_YEARS;
       const markerData = Array(MAX_YEARS + 1).fill(null);
       markerData[markerYr] = survivalData[markerYr];
       datasets.push({
@@ -1633,7 +1650,7 @@ function drawScatter(tab) {
     // Depletions tab — one dot per depleted run, stacked by depletion year
     const depleted = mcRuns
       .map((r, i) => ({ ...r, runIdx: i }))
-      .filter(r => r.depleted)
+      .filter(r => r.depleted && r.depletedYear <= MAX_YEARS)
       .sort((a, b) => a.depletedYear - b.depletedYear || a.runIdx - b.runIdx);
 
     const yearCount = {};
